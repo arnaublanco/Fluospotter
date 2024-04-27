@@ -1,5 +1,7 @@
 # Fluospotter
 
+<img src="logo.png" width="200px" align="right" alt="Logo of deepBlink.">
+
 Fluospotter is an end-to-end pipeline designed for comprehensive segmentation of nuclei and accurate detection of puncta in fluorescence microscopy images. In short, it offers:
 
 * **Nuclei segmentation:** Fluospotter employs a Deep Learning model to perform precise segmentation of nuclei in 3D, ensuring accurate delineation of their spatial boundaries.
