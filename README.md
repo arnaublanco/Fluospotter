@@ -1,6 +1,6 @@
 # Fluospotter
 
-<img src="logo.png" width="200px" align="right" alt="Logo of deepBlink.">
+<img src="logo.png" width="200px" align="right" alt="Logo of Fluospotter">
 
 Fluospotter is an end-to-end pipeline designed for comprehensive segmentation of nuclei and accurate detection of puncta in fluorescence microscopy images. In short, it offers:
 
