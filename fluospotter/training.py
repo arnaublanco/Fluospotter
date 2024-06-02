@@ -37,6 +37,7 @@ def get_lr(optimizer):
 
 
 def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, scheduler):
+    pdb.set_trace()
     model.train()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     n_opt_iters = 0
@@ -212,7 +213,7 @@ def train_model(
     print('* Creating Dataloaders, batch size = {}, samples/vol = {}, workers = {}'.format(cfg["batch_size"], cfg["n_samples"], cfg["num_workers"]))
 
     tr_loader, ovft_loader, vl_loader = get_loaders(data_path=dataset.data_dir, labels_path=labels_path, n_samples=cfg["n_samples"], neg_samples=cfg["neg_samples"],
-                                                    patch_size=cfg["patch_size"], num_workers=cfg["num_workers"], ovft_check=cfg["ovft_check"])
+                                                    patch_size=cfg["patch_size"], num_workers=cfg["num_workers"], ovft_check=cfg["ovft_check"], depth_last=cfg["depth_last"])
 
     print("Total params: {0:,}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
     opt_cfg = {}
@@ -222,7 +223,7 @@ def train_model(
         opt_cfg["weight_decay"] = cfg["weight_decay"]
     if "momentum" in cfg:
         opt_cfg["momentum"] = cfg["momentum"]
-    pdb.set_trace()
+
     optimizer = get_optimizer(cfg["optimizer"], opt_cfg, model.parameters())
     if cfg["cyclical_lr"]:
         scheduler_name = 'cosineAnnealingWarmRestarts'

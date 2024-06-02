@@ -1,5 +1,5 @@
 """Model utility functions for augmentation."""
-
+import pdb
 from typing import Tuple
 import warnings
 
@@ -13,16 +13,15 @@ def permute_depth(x):
     return torch.permute(x, [0, 2, 3, 1])
 
 
-def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False, depth_last=True, p_app=0.1, pr_geom=0.1):
-
+def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False, depth_last=False, p_app=0.1, pr_geom=0.1):
     def apply_depth_permutation(transforms_list):
         if depth_last:
             transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
 
     if multiclass:
         tr_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='seg'),
             t.ScaleIntensityd(keys=('img',)),
             t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
@@ -36,8 +35,8 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False,
         ]
 
         vl_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='img'),
             t.ScaleIntensityd(keys=('img',)),
             t.AsDiscreted(keys=('seg'), to_onehot=3)
@@ -45,8 +44,8 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False,
 
     else:
         tr_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='seg'),
             t.ScaleIntensityd(keys=('img',)),
             t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
@@ -60,8 +59,8 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False,
         ]
 
         vl_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='img'),
             t.ScaleIntensityd(keys=('img',)),
             t.ScaleIntensityd(keys=('seg',))
