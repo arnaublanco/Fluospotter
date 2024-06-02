@@ -5,7 +5,7 @@ from monai.networks.nets import UNet, DynUNet
 
 
 class CustomUNet:
-    def __init__(self, model_name, pretrained=None, in_c=1, n_classes=2, patch_size=None):
+    def __init__(self, model_name, pretrained=None, in_c=1, n_classes=2, patch_size=(64, 64, 16)):
         self.model = self.get_model(model_name=model_name, in_c=in_c, n_classes=n_classes, pretrained=pretrained,
                                     patch_size=patch_size)
 
@@ -54,8 +54,8 @@ class CustomUNet:
             if pretrained is not None:
                 try:
                     model.load_state_dict(pretrained)
-                except Exception as e:
-                    raise ValueError(f'Could not load pretrained weights {pretrained} for small_unet_3d.') from e
+                except Exception:
+                    raise ValueError(f'Could not load pretrained weights {pretrained} for small_unet_3d.')
         elif model_name == 'dynunet':
             # if patch_size = (256,256,48) -> spacings (1., 1., 5.)
             # if patch_size = (48,256,256) -> spacings (5., 1., 1.)
@@ -63,8 +63,8 @@ class CustomUNet:
             if pretrained is not None:
                 try:
                     model.load_state_dict(pretrained)
-                except Exception as e:
-                    raise ValueError(f'Could not load pretrained weights {pretrained} for dynunet.') from e
+                except Exception:
+                    raise ValueError(f'Could not load pretrained weights {pretrained} for dynunet.')
         else:
             raise ValueError(f'The given nuclei segmentation model \'{model_name}\' is not valid.')
 

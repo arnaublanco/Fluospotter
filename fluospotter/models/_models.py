@@ -30,10 +30,10 @@ class Model:
         batch_format_fn: Formatting function added in the specific model, e.g. spots.
         batch_augment_fn: Same as batch_format_fn for augmentation.
     """
-    def __init__(self,**kwargs):
-        #self.name = f"{DATESTRING}_{self.__class__.__name__}_{dataset_cls.name}_{network_fn.__name__}"
+    def __init__(self, **kwargs):
         pass
 
+        #self.name = f"{DATESTRING}_{self.__class__.__name__}_{dataset_cls.name}_{network_fn.__name__}"
         #self.augmentation_args = augmentation_args
         #self.batch_augment_fn = kwargs.get("batch_augment_fn", None)
         #self.batch_format_fn = kwargs.get("batch_format_fn", None)
@@ -43,57 +43,49 @@ class Model:
         #self.train_args = train_args
         #self.has_pre_model = pre_model is not None
 
-        #if self.has_pre_model:
-        #    self.network: torch.nn.Module = pre_model
-        #else:
-        #    try:
-        #        self.network = network_fn(**network_args)
-        #    except TypeError:
-        #        print("Default network args used.")
-        #        self.network = network_fn()
-
-    '''@property
+    @property
     def metrics(self) -> list:
         """Return metrics."""
         return ["accuracy"]
 
-    def fit(
+    def train(
         self, dataset: Dataset, augment_val: bool = True, callbacks: list = None,
     ) -> None:
         """Training loop."""
         if callbacks is None:
             callbacks = []
 
-        if not self.has_pre_model:
-            self.network.compile(
-                loss=self.loss_fn,
-                optimizer=self.optimizer_fn(float(self.train_args["learning_rate"])),
-                metrics=self.metrics,
-            )
+        #if not self.has_pre_model:
+        #    self.network.compile(
+        #        loss=self.loss_fn,
+        #        optimizer=self.optimizer_fn(float(self.train_args["learning_rate"])),
+        #        metrics=self.metrics,
+        #    )
 
-        train_sequence = Dataset(
-            dataset.x_train,
-            dataset.y_train,
-            self.train_args["batch_size"],
-            format_fn=self.batch_format_fn,
-            augment_fn=self.batch_augment_fn,
-            overfit=self.train_args["overfit"],
-        )
-        valid_sequence = Dataset(
-            dataset.x_valid,
-            dataset.y_valid,
-            self.train_args["batch_size"],
-            format_fn=self.batch_format_fn,
-            augment_fn=self.batch_augment_fn if augment_val else None,
-        )
+        #train_sequence = Dataset(
+        #    dataset.x_train,
+        #    dataset.y_train,
+        #    self.train_args["batch_size"],
+        #    format_fn=self.batch_format_fn,
+        #    augment_fn=self.batch_augment_fn,
+        #    overfit=self.train_args["overfit"],
+        #)
 
-        self.network.fit(
-            train_sequence,
-            epochs=self.train_args["epochs"],
-            callbacks=callbacks,
-            validation_data=valid_sequence,
-            shuffle=True,
-        )
+        #valid_sequence = Dataset(
+        #    dataset.x_valid,
+        #    dataset.y_valid,
+        #    self.train_args["batch_size"],
+        #    format_fn=self.batch_format_fn,
+        #    augment_fn=self.batch_augment_fn if augment_val else None,
+        #)
+
+        #self.network.fit(
+        #    train_sequence,
+        #    epochs=self.train_args["epochs"],
+        #    callbacks=callbacks,
+        #    validation_data=valid_sequence,
+        #    shuffle=True,
+        #)
 
     def evaluate(self, x: np.ndarray, y: np.ndarray) -> List[float]:
         """Evaluate on images / masks and return l2 norm and f1 score."""
@@ -107,4 +99,4 @@ class Model:
         rmse_ = rmse(y_float32, preds) * self.dataset_args["cell_size"]
         f1_score_ = f1_score(y_float32, preds)
 
-        return [f1_score_.numpy(), rmse_.numpy()]'''
+        return [f1_score_.numpy(), rmse_.numpy()]

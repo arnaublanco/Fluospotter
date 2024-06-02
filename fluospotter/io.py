@@ -8,6 +8,25 @@ from tifffile import imread
 EXTENSIONS = ("tif", "tiff")
 
 
+def check_configuration_file(cfg: Dict) -> Dict:
+    params = [
+        "n_classes", "model_name", "pretrained", "loss1", "loss2",
+        "alpha1", "alpha2", "batch_size", "acc_grad", "n_samples", "neg_samples",
+        "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
+        "cyclical_lr", "metric", "num_workers"
+    ]
+    values = [
+        1, "small_unet_3d", False, "ce", "dice",
+        1.0, 1.0, 1, 4, 12, 1,
+        4, "256/256/48", "adam", 3e-4, 20, 5,
+        True, "DSC", 0]
+
+    for p in range(len(params)):
+        if not (params[p] in cfg):
+            cfg[params[p]] = values[p]
+    return cfg
+
+
 def load_files(fname: str, training: bool = False) -> Dict[str, List[str]]:
     """Imports data for custom training and inference.
 
@@ -46,11 +65,11 @@ def load_files(fname: str, training: bool = False) -> Dict[str, List[str]]:
 
 
 def load_folder(fname: str) -> List[str]:
-    files = [file for file in os.listdir(fname) if file.lower().endswith(EXTENSIONS)]
+    files = [os.path.join(fname, file) for file in os.listdir(fname) if file.lower().endswith(EXTENSIONS)]
     size = None
     for f in files:
         try:
-            file = imread(os.path.join(fname, f))
+            file = imread(f)
             if size is None:
                 size = file.shape
             elif size != file.shape:
