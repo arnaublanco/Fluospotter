@@ -5,14 +5,14 @@ import math
 
 import numpy as np
 import skimage.morphology
-import tensorflow as tf
+#import tensorflow as tf
 
 from .data import get_coordinate_list
 from .data import next_power
 from .data import normalize_image
 
 
-def predict(
+'''def predict(
     image: np.ndarray,
     model: tf.keras.models.Model,
     probability: Union[None, float] = None,
@@ -129,4 +129,4 @@ def get_intensities(
             options = ["sum", "mean", "std"]
             raise ValueError(f'Method must be one of "{options}". {method} is not.')
 
-    return intensities
+    return intensities'''

@@ -4,162 +4,134 @@ from typing import Tuple
 import warnings
 
 import numpy as np
+import torch
+import monai.transforms as t
+from tifffile import imread
 
 
-def augment_batch_baseline(
-    images: np.ndarray,
-    masks: np.ndarray,
-    flip_: bool = False,
-    illuminate_: bool = False,
-    gaussian_noise_: bool = False,
-    rotate_: bool = False,
-    translate_: bool = False,
-    cell_size: int = 4,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Baseline augmentation function.
-
-    Probability of augmentations is determined in the corresponding functions
-    and not in this baseline.
-
-    Args:
-        images: Batch of input image to be augmented with shape (n, x, y).
-        masks: Batch of corresponding prediction matrix with ground truth values with shape (n, x, y).
-        flip_: If True, images might be flipped.
-        illuminate_: If True, images might be altered in illumination.
-        gaussian_noise_: If True, gaussian noise might be added.
-        rotate_: If True, images might be rotated.
-        translate_: If True, images might be translated.
-        cell_size: Size of one cell in the prediction matrix.
-    """
-    if images.shape.index(min(images.shape)) != 0:
-        warnings.warn(
-            f"Images have shape {images.shape} and might not be in the format (n, x, y)!",
-            UserWarning,
-        )
-    if masks.shape.index(min(masks.shape)) != 0:
-        warnings.warn(
-            f"Masks have shape {masks.shape} and might not be in the format (n, x, y)!",
-            UserWarning,
-        )
-
-    aug_images = []
-    aug_masks = []
-
-    for image, mask in zip(images, masks):
-        aug_image = image.copy()
-        aug_mask = mask.copy()
-
-        if flip_:
-            aug_image, aug_mask = flip(aug_image, aug_mask)
-        if illuminate_:
-            aug_image, aug_mask = illuminate(aug_image, aug_mask)
-        if gaussian_noise_:
-            aug_image, aug_mask = gaussian_noise(aug_image, aug_mask)
-        if rotate_:
-            aug_image, aug_mask = rotate(aug_image, aug_mask)
-        if translate_:
-            aug_image, aug_mask = translate(aug_image, aug_mask, cell_size=cell_size)
-
-        aug_images.append(aug_image)
-        aug_masks.append(aug_mask)
-
-    aug_images = np.array(aug_images, dtype=np.float32)
-    aug_masks = np.array(aug_masks, dtype=np.float32)
-
-    return aug_images, aug_masks
+def permute_depth(x):
+    return torch.permute(x, [0, 2, 3, 1])
 
 
-def flip(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Augment through horizontal/vertical flipping."""
-    rand_flip = np.random.randint(low=0, high=2)
+def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False, depth_last=True, p_app=0.1, pr_geom=0.1):
 
-    image = np.flip(image.copy(), rand_flip)
-    mask = np.flip(mask.copy(), rand_flip)
+    def apply_depth_permutation(transforms_list):
+        if depth_last:
+            transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
 
-    # Horizontal flip / change along x axis
-    if rand_flip == 0:
-        mask[..., 1] = np.where(mask[..., 0], 1 - mask[..., 1], mask[..., 1])
+    if multiclass:
+        tr_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='seg'),
+            t.ScaleIntensityd(keys=('img',)),
+            t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
+                                     num_samples=n_samples, pos=1, neg=neg_samples),
+            t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
+            t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=1),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2),
+            t.AsDiscreted(keys=('seg'), to_onehot=3)
+        ]
 
-    # Vertical flip / change along y axis
-    if rand_flip == 1:
-        mask[..., 2] = np.where(mask[..., 0], 1 - mask[..., 2], mask[..., 2])
+        vl_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='img'),
+            t.ScaleIntensityd(keys=('img',)),
+            t.AsDiscreted(keys=('seg'), to_onehot=3)
+        ]
 
-    return image, mask
+    else:
+        tr_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='seg'),
+            t.ScaleIntensityd(keys=('img',)),
+            t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
+                                     num_samples=n_samples, pos=1, neg=neg_samples),
+            t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
+            t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=1),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2),
+            t.ScaleIntensityd(keys=('seg',))
+        ]
 
+        vl_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='img'),
+            t.ScaleIntensityd(keys=('img',)),
+            t.ScaleIntensityd(keys=('seg',))
+        ]
 
-def illuminate(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Augment through changing illumination."""
-    rand_illumination = 1 + np.random.uniform(-0.75, 0.75)
-    image = image.copy()
-    image = np.multiply(image, rand_illumination)
-    return image, mask
+    # Apply depth permutation if needed
+    apply_depth_permutation(tr_transforms)
+    apply_depth_permutation(vl_transforms)
 
-
-def gaussian_noise(
-    image: np.ndarray, mask: np.ndarray, mean: int = 0
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Augment through the addition of gaussian noise.
-
-    Args:
-        image: Image to be augmented.
-        mask: Corresponding prediction matrix with ground truth values.
-        mean: Average noise pixel values added. Zero means no net difference occurs.
-    """
-    sigma = np.random.uniform(0.0001, 0.01)
-    noise = np.random.normal(mean, sigma, image.shape)
-    image = image.copy()
-
-    def _gaussian_noise(image: np.ndarray) -> np.ndarray:
-        """Gaussian noise helper."""
-        mask_overflow_upper = image + noise >= 1.0
-        mask_overflow_lower = image + noise < 0
-        noise[mask_overflow_upper] = 1.0
-        noise[mask_overflow_lower] = 0
-        image = np.add(image, noise)
-        return image
-
-    image = _gaussian_noise(image)
-
-    return image, mask
-
-
-def rotate(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Augment through rotation."""
-    rand_rotate = np.random.randint(low=0, high=4)
-    image = image.copy()
-    mask = mask.copy()
-    for _ in range(rand_rotate):
-
-        image = np.rot90(image)  # rotate image -90 degrees
-        mask = np.rot90(mask)  # rotate mask -90 degrees
-        r_coord = mask[..., 1].copy()
-        c_coord = mask[..., 2].copy()
-        mask[..., 1] = 1 - c_coord  # rotation coordinates +90 degrees + translation
-        mask[..., 2] = r_coord  # rotation coordinates +90 degrees
-        mask[..., 1][mask[..., 0] == 0] = 0
-        mask[..., 2][mask[..., 0] == 0] = 0
-
-    return image, mask
+    return t.Compose(tr_transforms), t.Compose(vl_transforms)
 
 
-def translate(
-    image: np.ndarray, mask: np.ndarray, cell_size: int = 4
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Augment through translation along all axes.
+def get_transforms_fullres(im_size, multiclass=False, p_app=0.1, pr_geom=0.1, depth_last=True):
+    def apply_depth_permutation(transforms_list):
+        if depth_last:
+            transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
 
-    Args:
-        image: Image to be augmented.
-        mask: Corresponding prediction matrix with ground truth values.
-        cell_size: Size of one cell in the prediction matrix.
-    """
-    direction = np.random.choice([0, 1])
-    image = image.copy()
-    mask = mask.copy()
+    if multiclass:
+        tr_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='img'),  # 0 is the default threshold
+            t.ScaleIntensityd(keys=('img',)),
+            t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
+            t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
+            t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=1),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2),
+            t.RandRotate90d(keys=('img', 'seg'), prob=pr_geom, max_k=3),
+            t.AsDiscreted(keys=('seg'), to_onehot=3)
+        ]
 
-    shift_mask = np.random.choice(range(len(image) // cell_size))
-    shift_image = shift_mask * cell_size
+        vl_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='img'),  # 0 is the default threshold
+            t.ScaleIntensityd(keys=('img',)),
+            t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
+            t.NormalizeIntensityd(keys=('img',), nonzero=True),
+            t.AsDiscreted(keys=('seg'), to_onehot=3)
+        ]
+    else:
+        tr_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='img'),  # 0 is the default threshold
+            t.ScaleIntensityd(keys=('img',)),
+            t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
+            t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
+            t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=1),
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2),
+            t.RandRotate90d(keys=('img', 'seg'), prob=pr_geom, max_k=3),
+            t.ScaleIntensityd(keys=('seg',))
+        ]
 
-    image = np.roll(image, shift_image, direction)
-    mask = np.roll(mask, shift_mask, direction)
+        vl_transforms = [
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='img'),  # 0 is the default threshold
+            t.ScaleIntensityd(keys=('img',)),
+            t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
+            t.NormalizeIntensityd(keys=('img',), nonzero=True),
+            t.ScaleIntensityd(keys=('seg',))
+        ]
 
-    return image, mask
+    # Apply depth permutation if needed
+    apply_depth_permutation(tr_transforms)
+    apply_depth_permutation(vl_transforms)
+
+    return t.Compose(tr_transforms), t.Compose(vl_transforms)

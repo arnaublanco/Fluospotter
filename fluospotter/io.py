@@ -1,89 +1,77 @@
 """Dataset preparation functions."""
 
-from typing import List, Tuple, Union
-import glob
+from typing import List, Tuple, Union, Dict
 import os
-import re
-
-import numpy as np
-import pandas as pd
-import skimage.color
-import skimage.io
-import tensorflow as tf
-
-from .losses import combined_bce_rmse
-from .losses import combined_dice_rmse
-from .losses import combined_f1_rmse
-from .losses import f1_score
-from .losses import rmse
+from tifffile import imread
 
 # List of currently supported image file extensions.
-EXTENSIONS = ("tif", "tiff", "jpeg", "jpg", "png")
+EXTENSIONS = ("tif", "tiff")
 
 
-def basename(path: Union[str, "os.PathLike[str]"]) -> str:
-    """Returns the basename removing path and extension."""
-    return os.path.splitext(os.path.basename(path))[0]
-
-
-def securename(fname: str) -> str:
-    """Turns potentially unsafe names into a single, safe, alphanumeric string."""
-    return re.sub(r"[^\w\d-]", "_", fname)
-
-
-def load_npz(
-    fname: Union[str, "os.PathLike[str]"], test_only: bool = False
-) -> List[np.ndarray]:
-    """Imports the standard npz file format used for custom training and inference.
-
-    Only for files saved using "np.savez_compressed(fname, x_train, y_train...)".
+def load_files(fname: str, training: bool = False) -> Dict[str, List[str]]:
+    """Imports data for custom training and inference.
 
     Args:
-        fname: Path to npz file.
-        test_only: Only return testing images and labels.
+        fname: Path to data files.
+        training: Only return testing images and labels if false.
 
     Returns:
-        A list of the required numpy arrays. If no "test_only" arguments were passed,
-        returns [x_train, y_train, x_valid, y_valid, x_test, y_test].
+        A dictionary with keys 'train', 'valid', 'test' containing lists of file paths.
 
     Raises:
-        ValueError: If not all datasets are found.
+        ValueError: If not all datasets are found when training.
     """
-    expected = ["x_train", "y_train", "x_valid", "y_valid", "x_test", "y_test"]
-    if test_only:
-        expected = expected[-2:]
+    expected = ["train", "valid", "test"]
+    check_if_folders_exist = {folder: os.path.isdir(os.path.join(fname, folder)) for folder in expected}
 
-    with np.load(fname, allow_pickle=True) as data:
-        if not all([e in data.files for e in expected]):
-            raise ValueError(f"{expected} must be present. Only found {data.files}.")
-        return [data[f] for f in expected]
+    data = {}
 
+    if training:
+        if all(check_if_folders_exist.values()):
+            # Training
+            for folder in expected:
+                data[folder] = load_folder(os.path.join(fname, folder))
+        else:
+            missing_folders = [folder for folder, exists in check_if_folders_exist.items() if not exists]
+            raise ValueError(f"{expected} must be present when training. Missing folders {missing_folders}.")
+    else:
+        # Inference
+        for folder in ["test"]:
+            if check_if_folders_exist["test"]:
+                data["test"] = load_folder(os.path.join(fname, "test"))
+            else:
+                raise ValueError("Test folder must be present for inference.")
 
-def load_image(
-    fname: Union[str, "os.PathLike[str]"],
-    extensions: Tuple[str, ...] = EXTENSIONS,
-    is_rgb: bool = False,
-) -> np.ndarray:
-    """Import a single image as numpy array checking format requirements.
-
-    Args:
-        fname: Absolute or relative filepath of image.
-        extensions: Allowed image extensions.
-        is_rgb: If true, converts RGB images to grayscale.
-    """
-    if not os.path.isfile(fname):
-        raise ImportError("Input file does not exist. Please provide a valid path.")
-    if not str(fname).lower().endswith(extensions):
-        raise ImportError(f"Input file extension invalid. Please use {extensions}.")
-    try:
-        image = skimage.io.imread(fname).squeeze().astype(np.float32)
-    except ValueError as error:
-        raise ImportError(f"File '{fname}' could not be imported.") from error
-    if is_rgb:
-        image = skimage.color.rgb2gray(image)
-    return image
+    return data
 
 
+def load_folder(fname: str) -> List[str]:
+    files = [file for file in os.listdir(fname) if file.lower().endswith(EXTENSIONS)]
+    size = None
+    for f in files:
+        try:
+            file = imread(os.path.join(fname, f))
+            if size is None:
+                size = file.shape
+            elif size != file.shape:
+                raise ValueError(f"Files do not coincide in shape. {f} has size {file.shape}, expected {size}")
+        except Exception as e:
+            raise ValueError(f"Could not load {os.path.join(fname, f)}.") from e
+    return files
+
+
+def validate_data_and_labels(data: Dict[str, List[str]], labels: Dict[str, List[str]]) -> bool:
+    for key in ['train', 'valid', 'test']:
+        if remove_extension(data[key]) != remove_extension(labels[key]):
+            return False
+    return True
+
+
+def remove_extension(file_list):
+    return {os.path.splitext(file)[0] for file in file_list}
+
+
+'''
 def load_model(fname: Union[str, "os.PathLike[str]"]) -> tf.keras.models.Model:
     """Import a deepBlink model from file."""
     if not os.path.isfile(fname):
@@ -122,26 +110,4 @@ def load_prediction(fname: Union[str, "os.PathLike[str]"]) -> pd.DataFrame:
         raise ValueError("Prediction file must contain columns 'x [px]' and 'y [px]'.")
     return df
 
-
-def grab_files(
-    path: Union[str, "os.PathLike[str]"], extensions: Tuple[str, ...]
-) -> List[str]:
-    """Grab all files in directory with listed extensions.
-
-    Args:
-        path: Path to files to be grabbed. Without trailing "/".
-        extensions: List of all file extensions. Without leading ".".
-
-    Returns:
-        Sorted list of all corresponding files.
-
-    Raises:
-        OSError: Path not existing.
-    """
-    if not os.path.exists(path):
-        raise OSError(f"Path must exist. '{path}' does not.")
-
-    files = []
-    for ext in extensions:
-        files.extend(sorted(glob.glob(f"{path}/*.{ext}")))
-    return sorted(files)
+'''

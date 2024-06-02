@@ -6,13 +6,13 @@ import datetime
 import os
 import platform
 
-import tensorflow as tf
+#import tensorflow as tf
 
 from .datasets import Dataset
 from .models import Model
 from .util import get_from_module
 
-
+'''
 def train_model(
     model: Model,
     dataset: Dataset,
@@ -119,4 +119,4 @@ def run_experiment(cfg: Dict, pre_model: tf.keras.models.Model = None):
     model = train_model(model, dataset, cfg, run_name, use_wandb)
 
     if use_wandb:
-        wandb.join()  # pylint:disable=E1101
+        wandb.join()  # pylint:disable=E1101'''

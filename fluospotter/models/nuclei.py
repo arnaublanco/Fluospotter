@@ -1,31 +1,20 @@
 """segmentation class."""
 
 import functools
-
 import numpy as np
-
-from ..augment import augment_batch_baseline
-from ..losses import combined_f1_rmse
-from ..losses import f1_score
-from ..losses import rmse
+from ..losses import combined_f1_rmse, f1_score, rmse
 from ._models import Model
+from ..networks.unet import CustomUNet
 
 
-class SpotsModel(Model):
-    """Class to predict spot localization; see base class."""
+class SegmentationModel(Model):
+    """Class to segment nuclei; see base class."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, pretrained=None, model_name='small_unet_3d', in_channels=1, n_classes=2, patch_size=(64, 64, 16),
+                 **kwargs):
         super().__init__(**kwargs)
-
-        self.batch_augment_fn = functools.partial(
-            augment_batch_baseline,
-            flip_=self.augmentation_args["flip"],
-            illuminate_=self.augmentation_args["illuminate"],
-            gaussian_noise_=self.augmentation_args["gaussian_noise"],
-            rotate_=self.augmentation_args["rotate"],
-            translate_=self.augmentation_args["translate"],
-            cell_size=self.dataset_args["cell_size"],
-        )
+        self.network = CustomUNet(model_name=model_name, pretrained=pretrained, in_c=in_channels, n_classes=n_classes,
+                                  patch_size=patch_size).model
 
     @property
     def metrics(self) -> list:

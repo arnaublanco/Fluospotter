@@ -1,93 +1,74 @@
 """UNet architecture."""
 
-import math
-
-import tensorflow as tf
-
-from ._networks import OPTIONS_CONV
-from ._networks import conv_block
-from ._networks import inception_block
-from ._networks import residual_block
-from ._networks import squeeze_block
-from ._networks import upconv_block
+import torch
+from monai.networks.nets import UNet, DynUNet
 
 
-def __block(inputs, filters, block, l2):
-    opts_conv = OPTIONS_CONV
-    opts_conv["kernel_regularizer"] = tf.keras.regularizers.l2(l2) if l2 else None
-    opts_conv["bias_regularizer"] = tf.keras.regularizers.l2(l2) if l2 else None
-    if block == "convolutional":
-        x = conv_block(inputs=inputs, filters=filters, n_convs=3, opts_conv=opts_conv)
-    if block == "inception":
-        x = inception_block(inputs=inputs, filters=filters, l2_regularizer=l2)
-    if block == "residual":
-        x = residual_block(inputs=inputs, filters=filters, opts_conv=opts_conv)
-    x = squeeze_block(x=x)
-    return x
+class CustomUNet:
+    def __init__(self, model_name, pretrained=None, in_c=1, n_classes=2, patch_size=None):
+        self.model = self.get_model(model_name=model_name, in_c=in_c, n_classes=n_classes, pretrained=pretrained,
+                                    patch_size=patch_size)
 
+    @staticmethod
+    def get_kernels_strides(patch_size=(64, 64, 16), spacings=(1.5625, 1.5625, 5.0)):
+        input_size = patch_size
+        strides, kernels = [], []
+        while True:
+            spacing_ratio = [sp / min(spacings) for sp in spacings]
+            stride = [2 if ratio <= 2 and size >= 8 else 1 for (ratio, size) in zip(spacing_ratio, patch_size)]
+            kernel = [3 if ratio <= 2 else 1 for ratio in spacing_ratio]
+            if all(s == 1 for s in stride):
+                break
+            for idx, (i, j) in enumerate(zip(patch_size, stride)):
+                if i % j != 0:
+                    raise ValueError(
+                        f"Patch size is not supported, please try to modify the size {input_size[idx]} in the spatial dimension {idx}."
+                    )
+            patch_size = [i / j for i, j in zip(patch_size, stride)]
+            spacings = [i * j for i, j in zip(spacings, stride)]
+            kernels.append(kernel)
+            strides.append(stride)
 
-def __encoder(inputs, filters, block, l2, dropout):
-    x = __block(inputs, filters, block, l2)
-    skip = tf.keras.layers.SpatialDropout2D(dropout)(x)
-    x = tf.keras.layers.MaxPool2D(pool_size=(2, 2))(skip)
-    return x, skip
+        strides.insert(0, len(spacings) * [1])
+        kernels.append(len(spacings) * [3])
+        return kernels, strides
 
+    @staticmethod
+    def get_dynunet(patch_size=(64, 64, 16), spacings=(1.5625, 1.5625, 5.0), in_channels=1, n_classes=2,
+                    deep_supr_num=0):
+        kernels, strides = CustomUNet.get_kernels_strides(patch_size, spacings)
+        deep_supervision = False if deep_supr_num == 0 else True
 
-def __decoder(inputs, skip, filters, block, l2):
-    x = __block(inputs, filters, block, l2)
-    x = upconv_block(inputs=x, skip=skip)
-    return x
+        net = DynUNet(spatial_dims=3, in_channels=in_channels, out_channels=n_classes, kernel_size=kernels,
+                      strides=strides,
+                      upsample_kernel_size=strides[1:], norm_name="instance", deep_supervision=deep_supervision,
+                      deep_supr_num=deep_supr_num)
 
+        return net
 
-def unet(
-    dropout: float = 0.2,
-    cell_size: int = 4,
-    filters: int = 5,
-    ndown: int = 2,
-    l2: float = 1e-6,
-    block: str = "convolutional",
-) -> tf.keras.models.Model:
-    """Unet model with second, cell size dependent encoder.
+    @staticmethod
+    def get_model(model_name, in_c=1, n_classes=2, pretrained=None, patch_size=(64, 64, 16)):
+        if model_name == 'small_unet_3d':
+            model = UNet(spatial_dims=3, in_channels=in_c, out_channels=n_classes, channels=(16, 32,), strides=(2,),
+                         num_res_units=1)
+            if pretrained is not None:
+                try:
+                    model.load_state_dict(pretrained)
+                except Exception as e:
+                    raise ValueError(f'Could not load pretrained weights {pretrained} for small_unet_3d.') from e
+        elif model_name == 'dynunet':
+            # if patch_size = (256,256,48) -> spacings (1., 1., 5.)
+            # if patch_size = (48,256,256) -> spacings (5., 1., 1.)
+            model = CustomUNet.get_dynunet(patch_size=patch_size, spacings=(5., 1., 1.), in_channels=in_c, n_classes=n_classes)
+            if pretrained is not None:
+                try:
+                    model.load_state_dict(pretrained)
+                except Exception as e:
+                    raise ValueError(f'Could not load pretrained weights {pretrained} for dynunet.') from e
+        else:
+            raise ValueError(f'The given nuclei segmentation model \'{model_name}\' is not valid.')
 
-    Note that "convolution" is the currently best block.
+        setattr(model, 'n_classes', n_classes)
+        setattr(model, 'patch_size', patch_size)
 
-    Arguments:
-        dropout: Percentage of dropout before each MaxPooling step.
-        cell_size: Size of one cell in the prediction matrix.
-        filters: Log_2 number of filters in the first inception block.
-        ndown: Downsampling steps in the first encoder / decoder.
-        l2: L2 value for kernel and bias regularization.
-        block: Type of block in each layer. [options: convolutional, inception, residual]
-    """
-    if not math.log(cell_size, 2).is_integer():
-        raise ValueError(f"cell_size must be a power of 2, but is {cell_size}.")
-
-    # Input
-    inputs = tf.keras.layers.Input(shape=(None, None, 1))
-    x = inputs
-    skip_layers = []
-
-    # Encoder v1
-    for n in range(ndown):
-        x, skip = __encoder(x, 2 ** (filters + n), block, l2, dropout)
-        skip_layers.append(skip)
-    skip_bottom = x
-
-    # Decoder
-    for n, skip in enumerate(reversed(skip_layers)):
-        x = __decoder(x, skip, 2 ** (filters + (ndown - n)), block, l2)
-
-    # Encoder v2
-    ndown_cell = int(math.log(cell_size, 2))
-    for n in range(ndown_cell):
-        x, _ = __encoder(x, 2 ** (filters + n), block, l2, dropout)
-
-    # Logit
-    if ndown == 2 and cell_size == 4:
-        x = tf.keras.layers.Concatenate()([skip_bottom, x])
-    x = __block(x, 2 ** (filters + ndown_cell), block, l2)
-    x = tf.keras.layers.Conv2D(filters=3, kernel_size=1, strides=1)(x)
-    x = tf.keras.layers.Activation("sigmoid")(x)
-    model = tf.keras.Model(inputs=inputs, outputs=x)
-
-    return model
+        return model
