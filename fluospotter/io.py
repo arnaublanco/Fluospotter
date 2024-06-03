@@ -16,7 +16,7 @@ def check_configuration_file(cfg: Dict) -> Dict:
         "cyclical_lr", "metric", "num_workers", "depth_last"
     ]
     values = [
-        1, "small_unet_3d", False, "ce", "dice",
+        2, "small_unet_3d", False, "ce", "dice",
         1.0, 1.0, 1, 4, 12, 1,
         4, "256/256/48", "adam", 3e-4, 20, 5,
         True, "DSC", 0, False]

@@ -196,10 +196,10 @@ def get_loaders_fullres(data_path, batch_size=1, im_size=(96, 96, 64), num_worke
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, ovft_check=0, depth_last=False):
+def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, ovft_check=0, depth_last=False, n_classes=2):
 
     tr_files, vl_files = get_train_val_test_splits(data_path, labels_path)
-    tr_transforms, vl_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size, depth_last=depth_last)
+    tr_transforms, vl_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size, depth_last=depth_last, n_classes=n_classes)
     batch_size = 1
     test_batch_size = 1
     gpu = torch.cuda.is_available()

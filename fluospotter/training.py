@@ -212,7 +212,8 @@ def train_model(
     print('* Creating Dataloaders, batch size = {}, samples/vol = {}, workers = {}'.format(cfg["batch_size"], cfg["n_samples"], cfg["num_workers"]))
 
     tr_loader, ovft_loader, vl_loader = get_loaders(data_path=dataset.data_dir, labels_path=labels_path, n_samples=int(cfg["n_samples"]), neg_samples=int(cfg["neg_samples"]),
-                                                    patch_size=tuple(map(int, cfg["patch_size"].split('/'))), num_workers=int(cfg["num_workers"]), ovft_check=cfg["ovft_check"], depth_last=cfg["depth_last"])
+                                                    patch_size=tuple(map(int, cfg["patch_size"].split('/'))), num_workers=int(cfg["num_workers"]), ovft_check=cfg["ovft_check"], depth_last=cfg["depth_last"],
+                                                    n_classes=int(cfg["n_classes"]))
 
     print("Total params: {0:,}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
     opt_cfg = {}
@@ -240,8 +241,8 @@ def train_model(
     start = time.time()
 
     if cfg["model_type"] == "segmentation":
-        tr_info = train_segmentation_model(model, optimizer, cfg["acc_grad"], loss_fn, cfg["batch_size"], tr_loader, ovft_loader, vl_loader, scheduler,
-                          cfg["metric"], cfg["n_epochs"], cfg["vl_interval"], save_path, cfg["n_classes"] > 1)
+        tr_info = train_segmentation_model(model, optimizer, cfg["acc_grad"], loss_fn, int(cfg["batch_size"]), tr_loader, ovft_loader, vl_loader, scheduler,
+                          cfg["metric"], int(cfg["n_epochs"]), int(cfg["vl_interval"]), save_path, int(cfg["n_classes"]) > 1)
     end = time.time()
 
     hours, rem = divmod(end - start, 3600)
