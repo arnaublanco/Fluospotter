@@ -17,11 +17,10 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False,
     def apply_depth_permutation(transforms_list):
         if depth_last:
             transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
-
     if multiclass:
         tr_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='seg'),
             t.ScaleIntensityd(keys=('img',)),
             t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
@@ -35,35 +34,32 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, multiclass=False,
         ]
 
         vl_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='img'),
             t.ScaleIntensityd(keys=('img',)),
             t.AsDiscreted(keys=('seg'), to_onehot=3)
         ]
 
     else:
-        tr_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
+        tr_transforms = t.Compose([
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='seg'),
-            t.ScaleIntensityd(keys=('img',)),
-            t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
-                                     num_samples=n_samples, pos=1, neg=neg_samples),
-            t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
-            t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
+            t.ScaleIntensityd(keys=('img','seg')),
+            t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size, num_samples=n_samples, pos=1, neg=neg_samples), # P(center=fground) = pos/(pos+neg) = 1/(1+neg)
+            t.RandScaleIntensityd(keys=('img', ), factors=0.05, prob=p_app),
+            t.RandShiftIntensityd(keys=('img', ), offsets=0.05, prob=p_app),
             t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
             t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=1),
-            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2),
-            t.ScaleIntensityd(keys=('seg',))
-        ]
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2)
+        ])
 
         vl_transforms = [
-            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8))}),
+            t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='img'),
-            t.ScaleIntensityd(keys=('img',)),
-            t.ScaleIntensityd(keys=('seg',))
+            t.ScaleIntensityd(keys=('img','seg'))
         ]
 
     # Apply depth permutation if needed
@@ -81,7 +77,7 @@ def get_transforms_fullres(im_size, multiclass=False, p_app=0.1, pr_geom=0.1, de
     if multiclass:
         tr_transforms = [
             t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='img'),  # 0 is the default threshold
             t.ScaleIntensityd(keys=('img',)),
             t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
@@ -96,7 +92,7 @@ def get_transforms_fullres(im_size, multiclass=False, p_app=0.1, pr_geom=0.1, de
 
         vl_transforms = [
             t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).squeeze(0)}),
+                                'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
             t.CropForegroundd(keys=('img', 'seg'), source_key='img'),  # 0 is the default threshold
             t.ScaleIntensityd(keys=('img',)),
             t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
@@ -104,20 +100,18 @@ def get_transforms_fullres(im_size, multiclass=False, p_app=0.1, pr_geom=0.1, de
             t.AsDiscreted(keys=('seg'), to_onehot=3)
         ]
     else:
-        tr_transforms = [
+        tr_transforms = t.Compose([
             t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
                                 'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
-            t.CropForegroundd(keys=('img', 'seg'), source_key='img'),  # 0 is the default threshold
-            t.ScaleIntensityd(keys=('img',)),
-            t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
-            t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
-            t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
+            t.CropForegroundd(keys=('img', 'seg'), source_key='seg'),
+            t.ScaleIntensityd(keys=('img','seg')),
+            t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size, num_samples=n_samples, pos=1, neg=neg_samples),
+            t.RandScaleIntensityd(keys=('img', ), factors=0.05, prob=p_app),
+            t.RandShiftIntensityd(keys=('img', ), offsets=0.05, prob=p_app),
             t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
             t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=1),
-            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2),
-            t.RandRotate90d(keys=('img', 'seg'), prob=pr_geom, max_k=3),
-            t.ScaleIntensityd(keys=('seg',))
-        ]
+            t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2)
+        ])
 
         vl_transforms = [
             t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),

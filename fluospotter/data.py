@@ -6,7 +6,7 @@ import operator
 import os
 import numpy as np
 import torch
-import monai.data as d
+import monai.data as md
 from torch.utils.data.dataset import Subset
 from .augment import get_transforms_fullres, get_transforms_patches
 
@@ -180,41 +180,39 @@ def get_loaders_fullres(data_path, batch_size=1, im_size=(96, 96, 64), num_worke
 
     test_batch_size = 2*batch_size
     gpu = torch.cuda.is_available()
-    tr_ds = d.Dataset(data=tr_files, transform=tr_transforms)
+    tr_ds = md.Dataset(data=tr_files, transform=tr_transforms)
 
-    vl_ds = d.Dataset(data=vl_files, transform=vl_transforms)
-    tr_loader = d.DataLoader(tr_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=gpu)
-    vl_loader = d.DataLoader(vl_ds, batch_size=test_batch_size, num_workers=num_workers, pin_memory=gpu)
+    vl_ds = md.Dataset(data=vl_files, transform=vl_transforms)
+    tr_loader = md.DataLoader(tr_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=gpu)
+    vl_loader = md.DataLoader(vl_ds, batch_size=test_batch_size, num_workers=num_workers, pin_memory=gpu)
     if ovft_check > 0:
-        ovft_ds = d.Dataset(data=tr_files, transform=vl_transforms)
+        ovft_ds = md.Dataset(data=tr_files, transform=vl_transforms)
         subset_size = len(vl_ds)
         subset_idxs = torch.randperm(len(ovft_ds))[:subset_size]
         ovft_ds = Subset(ovft_ds, subset_idxs)
-    else: ovft_ds = d.Dataset(data=tr_files, transform=vl_transforms)
-    ovft_loader = d.DataLoader(ovft_ds, batch_size=test_batch_size, num_workers=num_workers, pin_memory=gpu)
+    else: ovft_ds = md.Dataset(data=tr_files, transform=vl_transforms)
+    ovft_loader = md.DataLoader(ovft_ds, batch_size=test_batch_size, num_workers=num_workers, pin_memory=gpu)
 
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(96, 96, 64), num_workers=0, ovft_check=0, depth_last=False):
+def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, ovft_check=0, depth_last=False):
 
     tr_files, vl_files = get_train_val_test_splits(data_path, labels_path)
-
     tr_transforms, vl_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size, depth_last=depth_last)
     batch_size = 1
     test_batch_size = 1
-
     gpu = torch.cuda.is_available()
 
-    tr_ds = d.Dataset(data=tr_files, transform=tr_transforms)
-    vl_ds = d.Dataset(data=vl_files, transform=vl_transforms)
-    tr_loader = d.DataLoader(tr_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=gpu)
-    vl_loader = d.DataLoader(vl_ds, batch_size=test_batch_size, num_workers=0, pin_memory=gpu)
+    tr_ds = md.Dataset(data=tr_files, transform=tr_transforms)
+    vl_ds = md.Dataset(data=vl_files, transform=vl_transforms)
+    tr_loader = md.DataLoader(tr_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=gpu)
+    vl_loader = md.DataLoader(vl_ds, batch_size=test_batch_size, num_workers=0, pin_memory=gpu)
     if ovft_check > 0:
-        ovft_ds = d.Dataset(data=tr_files, transform=vl_transforms)
+        ovft_ds = md.Dataset(data=tr_files, transform=vl_transforms)
         subset_size = len(vl_ds)
         subset_idxs = torch.randperm(len(ovft_ds))[:subset_size]
         ovft_ds = Subset(ovft_ds, subset_idxs)
-    else: ovft_ds = d.Dataset(data=tr_files, transform=vl_transforms)
-    ovft_loader = d.DataLoader(ovft_ds, batch_size=test_batch_size, num_workers=0, pin_memory=gpu)
+    else: ovft_ds = md.Dataset(data=tr_files, transform=vl_transforms)
+    ovft_loader = md.DataLoader(ovft_ds, batch_size=test_batch_size, num_workers=0, pin_memory=gpu)
     return tr_loader, ovft_loader, vl_loader

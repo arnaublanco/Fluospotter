@@ -37,7 +37,6 @@ def get_lr(optimizer):
 
 
 def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, scheduler):
-    pdb.set_trace()
     model.train()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     n_opt_iters = 0
@@ -212,8 +211,8 @@ def train_model(
     model = model.to(device)
     print('* Creating Dataloaders, batch size = {}, samples/vol = {}, workers = {}'.format(cfg["batch_size"], cfg["n_samples"], cfg["num_workers"]))
 
-    tr_loader, ovft_loader, vl_loader = get_loaders(data_path=dataset.data_dir, labels_path=labels_path, n_samples=cfg["n_samples"], neg_samples=cfg["neg_samples"],
-                                                    patch_size=cfg["patch_size"], num_workers=cfg["num_workers"], ovft_check=cfg["ovft_check"], depth_last=cfg["depth_last"])
+    tr_loader, ovft_loader, vl_loader = get_loaders(data_path=dataset.data_dir, labels_path=labels_path, n_samples=int(cfg["n_samples"]), neg_samples=int(cfg["neg_samples"]),
+                                                    patch_size=tuple(map(int, cfg["patch_size"].split('/'))), num_workers=int(cfg["num_workers"]), ovft_check=cfg["ovft_check"], depth_last=cfg["depth_last"])
 
     print("Total params: {0:,}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
     opt_cfg = {}
@@ -227,10 +226,10 @@ def train_model(
     optimizer = get_optimizer(cfg["optimizer"], opt_cfg, model.parameters())
     if cfg["cyclical_lr"]:
         scheduler_name = 'cosineAnnealingWarmRestarts'
-        T = cfg["vl_interval"] * len(tr_loader) * cfg["n_samples"] // cfg["batch_size"]
+        T = cfg["vl_interval"] * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
     else:
         scheduler_name = 'cosineAnnealingLR'
-        T = cfg["n_epochs"] * len(tr_loader) * cfg["n_samples"] // cfg["batch_size"]
+        T = cfg["n_epochs"] * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
 
     scheduler = get_scheduler(scheduler=scheduler_name, optimizer=optimizer, T=T, eta_min=0)
     loss_fn = get_loss(cfg["loss1"], cfg["loss2"], cfg["alpha1"], cfg["alpha2"])

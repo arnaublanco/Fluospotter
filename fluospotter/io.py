@@ -87,7 +87,7 @@ def validate_data_and_labels(data: Dict[str, List[str]], labels: Dict[str, List[
 
 
 def remove_extension(file_list):
-    return {os.path.splitext(file)[0] for file in file_list}
+    return {os.path.basename(os.path.splitext(file)[0]) for file in file_list}
 
 
 '''
