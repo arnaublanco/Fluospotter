@@ -53,7 +53,8 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,5
                             'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
         t.CropForegroundd(keys=('img', 'seg'), source_key='img', allow_smaller=False),
         t.ScaleIntensityd(keys=('img',)),
-        t.AsDiscreted(keys=('seg'), to_onehot=3)
+        t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
+        t.AsDiscreted(keys=('seg'), to_onehot=n_classes)
     ]
 
     # Apply depth permutation if needed

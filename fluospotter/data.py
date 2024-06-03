@@ -208,6 +208,7 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
     vl_ds = md.Dataset(data=vl_files, transform=vl_transforms)
     tr_loader = md.DataLoader(tr_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=gpu)
     vl_loader = md.DataLoader(vl_ds, batch_size=test_batch_size, num_workers=0, pin_memory=gpu)
+    
     if ovft_check > 0:
         ovft_ds = md.Dataset(data=tr_files, transform=vl_transforms)
         subset_size = len(vl_ds)

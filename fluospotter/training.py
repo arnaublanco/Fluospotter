@@ -69,7 +69,7 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
             t.update()
 
 
-def validate(model, loader, loss_fn, slwin_bs=2, multiclass=False):
+def validate(model, loader, loss_fn, slwin_bs=2):
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = model.patch_size
@@ -79,28 +79,31 @@ def validate(model, loader, loss_fn, slwin_bs=2, multiclass=False):
         n_elems, running_dsc = 0, 0
         for val_data in loader:
             images, labels = val_data["img"].to(device), val_data["seg"]
+            n_classes = labels.shape[1]
             # val_outputs = sliding_window_inference(val_images.to(device), patch_size, slwin_bs, model, mode='gaussian').cpu()
             preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
             del images
+
             loss = loss_fn(preds, labels)
-            if multiclass:
-                preds = preds.argmax(dim=1).squeeze().numpy()
-                labels = labels.squeeze().numpy().astype(np.int8)
+            preds = preds.argmax(dim=1).squeeze().numpy()
+            labels = labels.squeeze().numpy().astype(np.int8)
 
-                dsc_score = [fast_bin_dice(labels == 1, preds == 1), fast_bin_dice(labels == 2, preds == 2)]
-                auc_score = [fast_bin_auc(labels == 1, preds == 1, partial=True), fast_bin_auc(labels == 2, preds == 2, partial=True)]
-                if np.isnan(dsc_score[0]): dsc_score[0] = 0
-                if np.isnan(dsc_score[1]): dsc_score[1] = 0
-            else:
-                preds = preds.sigmoid().squeeze().numpy()
-                th = threshold_otsu(preds)
-                preds = preds>th
+            dsc_score, auc_score = [], []
+            #pdb.set_trace()
+            for l in range(n_classes):
+                dsc_score.append(fast_bin_dice(labels[l], preds == l))
+                auc_score.append(fast_bin_auc(labels[l], preds == l, partial=True))
+                if np.isnan(dsc_score[l]): dsc_score[l] = 0
 
-                labels = labels.squeeze().numpy().astype(bool)
-                dsc_score = fast_bin_dice(labels, preds)
-                auc_score = fast_bin_auc(labels, preds, partial=True)
+            #preds = preds.sigmoid().squeeze().numpy()
+            #th = threshold_otsu(preds)
+            #preds = preds>th
 
-                if np.isnan(dsc_score): dsc_score = 0
+            #labels = labels.squeeze().numpy().astype(bool)
+            #dsc_score = fast_bin_dice(labels, preds)
+            #auc_score = fast_bin_auc(labels, preds, partial=True)
+
+            #if np.isnan(dsc_score): dsc_score = 0
             dscs.append(dsc_score)
             aucs.append(auc_score)
             losses.append(loss.item())
@@ -145,8 +148,8 @@ def train_segmentation_model(model, optimizer, acc_grad, loss_fn, bs, tr_loader,
         train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, scheduler)
         if (epoch + 1) % vl_interval == 0:
             with torch.inference_mode():
-                ovft_metrics = validate(model, ovft_loader, loss_fn, multiclass)
-                vl_metrics = validate(model, vl_loader, loss_fn, multiclass)
+                ovft_metrics = validate(model, ovft_loader, loss_fn)
+                vl_metrics = validate(model, vl_loader, loss_fn)
             tr_info = set_tr_info(tr_info, epoch, ovft_metrics, vl_metrics)
             s = get_eval_string(tr_info, epoch)
             print(s)
@@ -219,19 +222,19 @@ def train_model(
     print("Total params: {0:,}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
     opt_cfg = {}
     if "lr" in cfg:
-        opt_cfg["learning_rate"] = cfg["lr"]
+        opt_cfg["learning_rate"] = float(cfg["lr"])
     if "weight_decay" in cfg:
-        opt_cfg["weight_decay"] = cfg["weight_decay"]
+        opt_cfg["weight_decay"] = float(cfg["weight_decay"])
     if "momentum" in cfg:
-        opt_cfg["momentum"] = cfg["momentum"]
+        opt_cfg["momentum"] = float(cfg["momentum"])
 
     optimizer = get_optimizer(cfg["optimizer"], opt_cfg, model.parameters())
     if cfg["cyclical_lr"]:
         scheduler_name = 'cosineAnnealingWarmRestarts'
-        T = cfg["vl_interval"] * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
+        T = int(cfg["vl_interval"]) * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
     else:
         scheduler_name = 'cosineAnnealingLR'
-        T = cfg["n_epochs"] * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
+        T = int(cfg["n_epochs"]) * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
 
     scheduler = get_scheduler(scheduler=scheduler_name, optimizer=optimizer, T=T, eta_min=0)
     loss_fn = get_loss(cfg["loss1"], cfg["loss2"], float(cfg["alpha1"]), float(cfg["alpha2"]))
