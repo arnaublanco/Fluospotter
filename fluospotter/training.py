@@ -49,6 +49,7 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
                 step += bs
                 inputs, labels = (batch_data['img'][m:(m+bs)].to(device), batch_data['seg'][m:(m+bs)].to(device))
                 outputs = model(inputs)
+                #pdb.set_trace()
                 loss = loss_fn(outputs, labels)
                 loss = loss / acc_grad
                 loss.backward()
@@ -233,7 +234,7 @@ def train_model(
         T = cfg["n_epochs"] * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
 
     scheduler = get_scheduler(scheduler=scheduler_name, optimizer=optimizer, T=T, eta_min=0)
-    loss_fn = get_loss(cfg["loss1"], cfg["loss2"], cfg["alpha1"], cfg["alpha2"])
+    loss_fn = get_loss(cfg["loss1"], cfg["loss2"], float(cfg["alpha1"]), float(cfg["alpha2"]))
 
     print('* Instantiating loss function {:.2f}*{} + {:.2f}*{}'.format(cfg["alpha1"], cfg["loss1"], cfg["alpha2"],
                                                                        cfg["loss2"]))

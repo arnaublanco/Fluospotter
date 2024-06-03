@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from monai.losses import DiceLoss
 import warnings
+import pdb
 
 
 class CompoundLoss(nn.Module):
@@ -20,14 +21,16 @@ class CompoundLoss(nn.Module):
         self.alpha2 = alpha2
 
     def forward(self, y_pred, y_true, y_true_sk=None):
+        #pdb.set_trace()
         if y_true_sk:
-            l1 = self.loss1(y_pred[0:1], y_true[0:1], y_true_sk)
-            l2 = self.loss2(y_pred[2:], y_true[2:], y_true_sk)
+            l1 = self.loss1(y_pred[0,0:1], y_true[0,0:1], y_true_sk)
+            l2 = self.loss2(y_pred[0,2:], y_true[0,2:], y_true_sk)
+        elif y_pred.shape[1] > 2:
+            l1 = self.loss1(y_pred[0,0:1], y_true[0,0:1])
+            l2 = self.loss2(y_pred[0,2:], y_true[0,2:])
         else:
-            l1 = self.loss1(y_pred[0:1], y_true[0:1])
-            l2 = self.loss2(y_pred[2:], y_true[2:])
-        if self.alpha2 == 0 or self.loss2 is None:
-            return self.alpha1*l1
+            l1 = self.loss1(y_pred[0,0], y_true[0,0])
+            l2 = self.loss2(y_pred[0,1], y_true[0,1])
         return self.alpha1*l1 + self.alpha2 * l2
 
 
