@@ -43,13 +43,11 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
     with trange(len(tr_loader)) as t:
         step, n_elems, running_loss = 0, 0, 0
         for (i_batch, batch_data) in enumerate(tr_loader):  # load 1 scan from the training set
-            #if i_batch == 2: break
             n_samples = len(batch_data['seg'])  # nr of px x py x pz patches (see args.n_samples)
             for m in range(0, n_samples, bs):  # we loop over batch_data picking up bs patches at a time
                 step += bs
                 inputs, labels = (batch_data['img'][m:(m+bs)].to(device), batch_data['seg'][m:(m+bs)].to(device))
                 outputs = model(inputs)
-                #pdb.set_trace()
                 loss = loss_fn(outputs, labels)
                 loss = loss / acc_grad
                 loss.backward()
@@ -80,17 +78,15 @@ def validate(model, loader, loss_fn, slwin_bs=2):
         for val_data in loader:
             images, labels = val_data["img"].to(device), val_data["seg"]
             n_classes = labels.shape[1]
-            # val_outputs = sliding_window_inference(val_images.to(device), patch_size, slwin_bs, model, mode='gaussian').cpu()
             preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
             del images
-
             loss = loss_fn(preds, labels)
             preds = preds.argmax(dim=1).squeeze().numpy()
             labels = labels.squeeze().numpy().astype(np.int8)
 
             dsc_score, auc_score = [], []
             #pdb.set_trace()
-            for l in range(n_classes):
+            for l in range(1,n_classes):
                 dsc_score.append(fast_bin_dice(labels[l], preds == l))
                 auc_score.append(fast_bin_auc(labels[l], preds == l, partial=True))
                 if np.isnan(dsc_score[l]): dsc_score[l] = 0
@@ -172,7 +168,8 @@ def train_segmentation_model(model, optimizer, acc_grad, loss_fn, bs, tr_loader,
 
 def train_model(
     model: Model,
-    dataset: Dataset
+    dataset: Dataset,
+    model_type: str
 ) -> None:
     callbacks = []
     use_cuda = torch.cuda.is_available()
@@ -189,14 +186,14 @@ def train_model(
     else:
         save_path = os.path.join(dataset.data_dir, '../experiments')
 
-    if cfg["model_type"] == "segmentation":
+    if model_type == "segmentation":
         save_path = os.path.join(save_path, 'segmentation')
         labels_path = dataset.segmentation_dir
-    elif cfg["model_type"] == "punctaDetection":
+    elif model_type == "punctaDetection":
         save_path = os.path.join(save_path, 'punctaDetection')
         labels_path = dataset.spots_dir
     else:
-        raise ValueError("Model type {} not recognized".format(cfg["model_type"]))
+        raise ValueError("Model type {} not recognized".format(model_type))
 
     os.makedirs(save_path, exist_ok=True)
 
@@ -209,7 +206,7 @@ def train_model(
     #patch_size = args.patch_size.split('/')
     #patch_size = tuple(map(int, patch_size))
 
-    print('* Instantiating a {} model for {}'.format(model.model_name, cfg["model_type"]))
+    print('* Instantiating a {} model for {}'.format(model.model_name, model_type))
     in_c = 1
     model = model.network
     model = model.to(device)
@@ -244,7 +241,7 @@ def train_model(
     print('* Starting to train\n', '-' * 10)
     start = time.time()
 
-    if cfg["model_type"] == "segmentation":
+    if model_type == "segmentation":
         tr_info = train_segmentation_model(model, optimizer, cfg["acc_grad"], loss_fn, int(cfg["batch_size"]), tr_loader, ovft_loader, vl_loader, scheduler,
                           cfg["metric"], int(cfg["n_epochs"]), int(cfg["vl_interval"]), save_path, int(cfg["n_classes"]) > 1)
     end = time.time()

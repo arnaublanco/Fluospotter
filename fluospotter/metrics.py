@@ -6,10 +6,16 @@ import warnings
 import numpy as np
 import pandas as pd
 import scipy.optimize
-import numpy as np
 from scipy.stats import rankdata
+from typing import Dict, Any
+from datasets import Dataset
+from models import Model
 
 EPS = 1e-12
+
+
+def compute_segmentation_metrics(model: Model, cfg: Dict, data: Dataset):
+    return True
 
 
 def fast_bin_auc(actual, predicted, partial=False):

@@ -1,6 +1,6 @@
 """Dataset preparation functions."""
 
-from typing import List, Tuple, Union, Dict
+from typing import List, Tuple, Union, Dict, Any
 import os
 from tifffile import imread
 
@@ -9,6 +9,14 @@ EXTENSIONS = ("tif", "tiff")
 
 
 def check_configuration_file(cfg: Dict) -> Dict:
+    """Ensures the configuration dictionary contains all necessary parameters.
+
+        Args:
+            cfg: Configuration dictionary.
+
+        Returns:
+            Updated configuration dictionary with default values added for missing parameters.
+    """
     params = [
         "n_classes", "model_name", "pretrained", "loss1", "loss2",
         "alpha1", "alpha2", "batch_size", "acc_grad", "n_samples", "neg_samples",
@@ -65,6 +73,17 @@ def load_files(fname: str, training: bool = False) -> Dict[str, List[str]]:
 
 
 def load_folder(fname: str) -> List[str]:
+    """Loads all image files from a given folder and checks their consistency in size.
+
+        Args:
+            fname: Path to the folder containing image files.
+
+        Returns:
+            A list of file paths.
+
+        Raises:
+            ValueError: If the files do not coincide in shape or cannot be loaded.
+    """
     files = [os.path.join(fname, file) for file in os.listdir(fname) if file.lower().endswith(EXTENSIONS)]
     size = None
     for f in files:
@@ -80,6 +99,15 @@ def load_folder(fname: str) -> List[str]:
 
 
 def validate_data_and_labels(data: Dict[str, List[str]], labels: Dict[str, List[str]]) -> bool:
+    """Validates that data and label files match in their basename (excluding extensions).
+
+        Args:
+            data: Dictionary containing lists of data file paths.
+            labels: Dictionary containing lists of label file paths.
+
+        Returns:
+            True if data and label files match, False otherwise.
+    """
     for key in ['train', 'valid', 'test']:
         if remove_extension(data[key]) != remove_extension(labels[key]):
             return False
@@ -87,8 +115,15 @@ def validate_data_and_labels(data: Dict[str, List[str]], labels: Dict[str, List[
 
 
 def remove_extension(file_list):
-    return {os.path.basename(os.path.splitext(file)[0]) for file in file_list}
+    """Removes the file extension from a list of file paths.
 
+        Args:
+            file_list: List of file paths.
+
+        Returns:
+            A set of file basenames without extensions.
+    """
+    return {os.path.basename(os.path.splitext(file)[0]) for file in file_list}
 
 '''
 def load_model(fname: Union[str, "os.PathLike[str]"]) -> tf.keras.models.Model:
@@ -128,5 +163,4 @@ def load_prediction(fname: Union[str, "os.PathLike[str]"]) -> pd.DataFrame:
     if not all([c in df.columns for c in ["x [px]", "y [px]"]]):
         raise ValueError("Prediction file must contain columns 'x [px]' and 'y [px]'.")
     return df
-
 '''
