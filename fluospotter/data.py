@@ -9,6 +9,7 @@ import torch
 import monai.data as md
 from torch.utils.data.dataset import Subset
 from .augment import get_transforms_fullres, get_transforms_patches
+from metrics import iou
 
 
 def next_power(x: int, k: int = 2) -> int:
@@ -145,6 +146,19 @@ def get_prediction_matrix(
     return prediction_matrix
 
 
+def get_test_split(data_path='data', labels_path='labels'):
+    data_test = os.path.join(data_path, 'test')
+    annotations_test = os.path.join(labels_path, 'test')
+
+    vol_list_test = os.listdir(data_test)
+    seg_list_test = os.listdir(annotations_test)
+    vol_list_test = [os.path.join(data_test, n) for n in vol_list_test]
+    seg_list_test= [os.path.join(annotations_test, n) for n in seg_list_test]
+    test_files = [{'img': img, 'seg': seg} for img, seg in zip(vol_list_test, seg_list_test)]
+
+    return test_files
+
+
 def get_train_val_test_splits(data_path='data', labels_path='labels'):
     data_train, data_valid = os.path.join(data_path, 'train'), os.path.join(data_path, 'valid')
     annotations_train, annotations_valid = os.path.join(labels_path, 'train'), os.path.join(labels_path, 'valid')
@@ -217,3 +231,29 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
     else: ovft_ds = md.Dataset(data=tr_files, transform=vl_transforms)
     ovft_loader = md.DataLoader(ovft_ds, batch_size=test_batch_size, num_workers=0, pin_memory=gpu)
     return tr_loader, ovft_loader, vl_loader
+
+
+def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2):
+    test_files = get_test_split(data_path, labels_path)
+    _, test_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size,
+                                                          depth_last=depth_last, n_classes=n_classes)
+    batch_size = 1
+    gpu = torch.cuda.is_available()
+    test_ds = md.Dataset(data=test_files, transform=test_transforms)
+    test_loader = md.DataLoader(test_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=gpu)
+    return test_loader
+
+
+def match_labeling(actual, predicted):
+    pdb.set_trace()
+    new_labels = predicted.copy()
+    for pred_label in range(np.unique(predicted)[1:]):
+        current = (predicted == pred_label)
+        new_label, prev_overlap = pred_label, 0
+        for actual_label in range(np.unique(actual)[1:]):
+            overlap = iou(actual == actual_label, current)
+            if overlap > prev_overlap:
+                prev_overlap = overlap
+                new_label = actual_label
+        new_labels[new_labels == pred_label] = new_label
+    return actual, new_labels

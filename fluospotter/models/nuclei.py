@@ -1,4 +1,5 @@
 """segmentation class."""
+import pdb
 
 import numpy as np
 import torch
@@ -6,9 +7,10 @@ from ..datasets import Dataset
 from ..losses import combined_f1_rmse, f1_score, rmse
 from ._models import Model
 from ..networks.unet import CustomUNet
-from ..training import train_model
+from ..training import train_model, evaluate
 from ..io import check_configuration_file
 from ..metrics import compute_segmentation_metrics
+from ..data import get_loaders_test
 
 
 class SegmentationModel(Model):
@@ -40,11 +42,25 @@ class SegmentationModel(Model):
         train_model(dataset=dataset, model=self, model_type="segmentation")
 
     def predict(self, dataset: Dataset) -> None:
-        test_sequence = dataset.segmentation_data_test()
+        data_path, labels_path = dataset.segmentation_data_test()
+        test_loaders = get_loaders_test(data_path=data_path, labels_path=labels_path,
+                                        n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
+                                        patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
+                                        num_workers=int(self.cfg["num_workers"]),
+                                        depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]))
+        evaluate(self.network,test_loaders)
 
     def predict_on_image(self, image: np.ndarray) -> np.ndarray:
         """Predict on a single input image."""
         return self.network.predict(image[None, ..., None], batch_size=1).squeeze()
 
     def evaluate(self, dataset: Dataset, display: bool = True) -> None:
-        compute_segmentation_metrics(model=self.network, cfg=self.cfg, data=dataset)
+        pdb.set_trace()
+        data_path, labels_path = dataset.segmentation_data_test()
+        test_loaders = get_loaders_test(data_path=data_path, labels_path=labels_path,
+                                        n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
+                                        patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
+                                        num_workers=int(self.cfg["num_workers"]),
+                                        depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]))
+        predicted, actual = evaluate(self.network, test_loaders)
+        compute_segmentation_metrics(predicted=predicted, actual=actual)

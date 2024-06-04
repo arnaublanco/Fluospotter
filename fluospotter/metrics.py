@@ -10,12 +10,60 @@ from scipy.stats import rankdata
 from typing import Dict, Any
 from datasets import Dataset
 from models import Model
+import pdb
 
 EPS = 1e-12
 
 
-def compute_segmentation_metrics(model: Model, cfg: Dict, data: Dataset):
-    return True
+def compute_segmentation_metrics(predicted: list, actual: list):
+    pdb.set_trace()
+    for i in range(len(predicted)):
+        iou_score = iou(actual[i], predicted[i])
+        dice_score = dice_coefficient(actual[i], predicted[i])
+        matches = matched_segments(actual[i], predicted[i])
+        pq_score = panoptic_quality(actual[i], predicted[i])
+        pr_score = precision_recall_score(matches)
+
+
+def iou(actual, predicted):
+    pdb.set_trace()
+    tp, fp, fn = np.sum(actual == predicted), np.sum((actual == 1) & (predicted == 0)), np.sum((actual == 1) & (predicted == 0))
+    return tp / (tp + fp + fn + EPS)
+
+
+def dice_coefficient(actual, predicted):
+    pdb.set_trace()
+    return 2*np.sum(actual == predicted) / (np.sum(actual) + np.sum(predicted) + EPS) # dice = 2|A ∩ B|/(|A|+|B|)
+
+
+def panoptic_quality(actual, predicted):
+    pdb.set_trace()
+    tp, fp, fn, matches = 0, 0, 0, matched_segments(actual, predicted)
+    for m in matches.keys():
+        tp += int(matches[m][0] & matches[m][1])
+        fp += int((not matches[m][0]) & matches[m][1])
+        fn += int(matches[m][0] & (not matches[m][1]))
+    da, sq = tp/(tp + fp/2 + fn/2 + EPS), 0
+    for label in range(np.unique(actual)[1:]): sq += iou((actual == label), (predicted == label))
+    sq /= (tp + EPS)
+    return da*sq # PQ = (TP / (TP + FP / 2 + FN / 2) * (sum(x, y) over TP IoU(x, y)) / TP
+
+
+def precision_recall_score(matches):
+    tp, fp, fn = 0, 0, 0
+    for m in matches.keys():
+        tp += int(matches[m][0] & matches[m][1])
+        fp += int((not matches[m][0]) & matches[m][1])
+        fn += int(matches[m][0] & (not matches[m][1]))
+    return tp/(tp + fp + EPS), tp/(tp + fn + EPS)
+
+
+def matched_segments(actual, predicted, thr=0.5):
+    pdb.set_trace()
+    matches = {}
+    for label in range(np.unique(actual)[1:]): matches[label] = [iou((actual == label), (predicted == label)) > thr]
+    for label in range(np.unique(predicted)[1:]): matches[label].append(iou((actual == label), (predicted == label)) > thr)
+    return matches
 
 
 def fast_bin_auc(actual, predicted, partial=False):
