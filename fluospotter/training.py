@@ -112,26 +112,20 @@ def validate(model, loader, loss_fn, slwin_bs=2):
     return [100 * np.mean(np.array(dscs)), 100 * np.mean(np.array(aucs)), np.mean(np.array(losses))]
 
 
-def evaluate(model, loader):
+def evaluate(model, loader, slwin_bs=2):
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = model.patch_size
     predictions, annotations = [], []
     with trange(len(loader)) as t:
-        n_elems, running_dsc = 0, 0
         for val_data in loader:
             images, labels = val_data["img"].to(device), val_data["seg"]
-            n_classes = labels.shape[1]
             preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
             del images
             preds = preds.argmax(dim=1).squeeze().numpy()
             labels = labels.squeeze().numpy().astype(np.int8)
             predictions.append(preds), annotations.append(labels)
-            running_dsc += 1
-            run_dsc = running_dsc / n_elems
-            t.set_postfix(DSC="{:.2f}".format(100 * run_dsc))
             t.update()
-
     return predictions, annotations
 
 def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch=False):

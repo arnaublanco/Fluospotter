@@ -9,7 +9,7 @@ import torch
 import monai.data as md
 from torch.utils.data.dataset import Subset
 from .augment import get_transforms_fullres, get_transforms_patches
-from metrics import iou
+from .metrics import iou
 
 
 def next_power(x: int, k: int = 2) -> int:

@@ -9,47 +9,47 @@ import scipy.optimize
 from scipy.stats import rankdata
 from typing import Dict, Any
 from datasets import Dataset
-from models import Model
 import pdb
 
 EPS = 1e-12
 
 
-def compute_segmentation_metrics(predicted: list, actual: list):
-    pdb.set_trace()
+def compute_segmentation_metrics(predicted: list, actual: list) -> Dict:
+    metrics = {'iou': [], 'dice': [], 'panoptic_quality': [], 'precision': [], 'recall': []}
     for i in range(len(predicted)):
-        iou_score = iou(actual[i], predicted[i])
-        dice_score = dice_coefficient(actual[i], predicted[i])
+        metrics['iou'].append(iou(actual[i], predicted[i]))
+        metrics['dice'].append(dice_coefficient(actual[i], predicted[i]))
         matches = matched_segments(actual[i], predicted[i])
-        pq_score = panoptic_quality(actual[i], predicted[i])
-        pr_score = precision_recall_score(matches)
+        metrics['panoptic_quality'].append(panoptic_quality(actual[i], predicted[i]))
+        precision, recall = precision_recall_score(matches)
+        metrics['precision'].append(precision), metrics['recall'].append(recall)
+    return metrics
 
 
-def iou(actual, predicted):
-    pdb.set_trace()
+def iou(actual, predicted) -> float:
     tp, fp, fn = np.sum(actual == predicted), np.sum((actual == 1) & (predicted == 0)), np.sum((actual == 1) & (predicted == 0))
     return tp / (tp + fp + fn + EPS)
 
 
-def dice_coefficient(actual, predicted):
-    pdb.set_trace()
-    return 2*np.sum(actual == predicted) / (np.sum(actual) + np.sum(predicted) + EPS) # dice = 2|A ∩ B|/(|A|+|B|)
+def dice_coefficient(actual, predicted) -> float:
+    tp, fp, fn = np.sum(actual == predicted), np.sum((actual == 1) & (predicted == 0)), np.sum(
+        (actual == 1) & (predicted == 0))
+    return 2*tp / (2*tp + fp + fn)
 
 
-def panoptic_quality(actual, predicted):
-    pdb.set_trace()
+def panoptic_quality(actual, predicted) -> float:
     tp, fp, fn, matches = 0, 0, 0, matched_segments(actual, predicted)
     for m in matches.keys():
         tp += int(matches[m][0] & matches[m][1])
         fp += int((not matches[m][0]) & matches[m][1])
         fn += int(matches[m][0] & (not matches[m][1]))
     da, sq = tp/(tp + fp/2 + fn/2 + EPS), 0
-    for label in range(np.unique(actual)[1:]): sq += iou((actual == label), (predicted == label))
+    for label in np.unique(actual)[1:]: sq += iou((actual == label), (predicted == label))
     sq /= (tp + EPS)
-    return da*sq # PQ = (TP / (TP + FP / 2 + FN / 2) * (sum(x, y) over TP IoU(x, y)) / TP
+    return da*sq
 
 
-def precision_recall_score(matches):
+def precision_recall_score(matches) -> (float, float):
     tp, fp, fn = 0, 0, 0
     for m in matches.keys():
         tp += int(matches[m][0] & matches[m][1])
@@ -58,11 +58,10 @@ def precision_recall_score(matches):
     return tp/(tp + fp + EPS), tp/(tp + fn + EPS)
 
 
-def matched_segments(actual, predicted, thr=0.5):
-    pdb.set_trace()
+def matched_segments(actual, predicted, thr=0.5) -> Dict:
     matches = {}
-    for label in range(np.unique(actual)[1:]): matches[label] = [iou((actual == label), (predicted == label)) > thr]
-    for label in range(np.unique(predicted)[1:]): matches[label].append(iou((actual == label), (predicted == label)) > thr)
+    for label in np.unique(actual)[1:]: matches[label] = [iou((actual == label), (predicted == label)) > thr]
+    for label in np.unique(predicted)[1:]: matches[label].append(iou((actual == label), (predicted == label)) > thr)
     return matches
 
 

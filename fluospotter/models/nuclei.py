@@ -55,9 +55,7 @@ class SegmentationModel(Model):
         return self.network.predict(image[None, ..., None], batch_size=1).squeeze()
 
     def evaluate(self, dataset: Dataset, display: bool = True) -> None:
-        pdb.set_trace()
-        data_path, labels_path = dataset.segmentation_data_test()
-        test_loaders = get_loaders_test(data_path=data_path, labels_path=labels_path,
+        test_loaders = get_loaders_test(data_path=dataset.data_dir, labels_path=dataset.segmentation_dir,
                                         n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
