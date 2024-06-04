@@ -1,6 +1,6 @@
 """List of functions to handle data including converting matrices <-> coordinates."""
 import pdb
-from typing import Tuple
+from typing import Tuple, Dict
 import math
 import operator
 import os
@@ -10,6 +10,8 @@ import monai.data as md
 from torch.utils.data.dataset import Subset
 from .augment import get_transforms_fullres, get_transforms_patches
 from .metrics import iou
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def next_power(x: int, k: int = 2) -> int:
@@ -233,10 +235,10 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2):
+def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(49, 512, 512)):
     test_files = get_test_split(data_path, labels_path)
     _, test_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size,
-                                                          depth_last=depth_last, n_classes=n_classes)
+                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size)
     batch_size = 1
     gpu = torch.cuda.is_available()
     test_ds = md.Dataset(data=test_files, transform=test_transforms)
@@ -257,3 +259,8 @@ def match_labeling(actual, predicted):
                 new_label = actual_label
         new_labels[new_labels == pred_label] = new_label
     return actual, new_labels
+
+
+def display_segmentation_metrics(metrics: Dict):
+    tabular_data = pd.DataFrame(data=metrics)
+    print(tabular_data)

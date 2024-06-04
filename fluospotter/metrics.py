@@ -14,15 +14,15 @@ import pdb
 EPS = 1e-12
 
 
-def compute_segmentation_metrics(predicted: list, actual: list) -> Dict:
-    metrics = {'iou': [], 'dice': [], 'panoptic_quality': [], 'precision': [], 'recall': []}
-    for i in range(len(predicted)):
-        metrics['iou'].append(iou(actual[i], predicted[i]))
-        metrics['dice'].append(dice_coefficient(actual[i], predicted[i]))
-        matches = matched_segments(actual[i], predicted[i])
-        metrics['panoptic_quality'].append(panoptic_quality(actual[i], predicted[i]))
-        precision, recall = precision_recall_score(matches)
-        metrics['precision'].append(precision), metrics['recall'].append(recall)
+def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics: Dict) -> Dict:
+    if len(metrics) == 0:
+        metrics = {'iou': [], 'dice': [], 'panoptic_quality': [], 'precision': [], 'recall': []}
+    metrics['iou'].append(iou(actual, predicted))
+    metrics['dice'].append(dice_coefficient(actual, predicted))
+    matches = matched_segments(actual, predicted)
+    metrics['panoptic_quality'].append(panoptic_quality(actual, predicted))
+    precision, recall = precision_recall_score(matches)
+    metrics['precision'].append(precision), metrics['recall'].append(recall)
     return metrics
 
 

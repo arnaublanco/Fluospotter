@@ -10,7 +10,7 @@ from ..networks.unet import CustomUNet
 from ..training import train_model, evaluate
 from ..io import check_configuration_file
 from ..metrics import compute_segmentation_metrics
-from ..data import get_loaders_test
+from ..data import get_loaders_test, display_segmentation_metrics
 
 
 class SegmentationModel(Model):
@@ -59,6 +59,7 @@ class SegmentationModel(Model):
                                         n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
-                                        depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]))
-        predicted, actual = evaluate(self.network, test_loaders)
-        compute_segmentation_metrics(predicted=predicted, actual=actual)
+                                        depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]), im_size=tuple(map(int, self.cfg["im_size"].split('/'))))
+        metrics = evaluate(self.network, test_loaders, self.cfg)
+        if display:
+            display_segmentation_metrics(metrics)

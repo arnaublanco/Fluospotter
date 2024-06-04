@@ -20,6 +20,7 @@ from .optimizers import get_optimizer, get_scheduler
 from .losses import get_loss
 from .metrics import fast_bin_dice, fast_bin_auc
 from skimage.filters import threshold_otsu
+from .metrics import compute_segmentation_metrics
 
 def init_tr_info():
     # I customize this function for each project.
@@ -112,11 +113,11 @@ def validate(model, loader, loss_fn, slwin_bs=2):
     return [100 * np.mean(np.array(dscs)), 100 * np.mean(np.array(aucs)), np.mean(np.array(losses))]
 
 
-def evaluate(model, loader, slwin_bs=2):
+def evaluate(model, loader, cfg, slwin_bs=2):
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
-    patch_size = model.patch_size
-    predictions, annotations = [], []
+    patch_size = tuple(map(int, cfg["patch_size"].split('/')))
+    metrics = {}
     with trange(len(loader)) as t:
         for val_data in loader:
             images, labels = val_data["img"].to(device), val_data["seg"]
@@ -124,9 +125,11 @@ def evaluate(model, loader, slwin_bs=2):
             del images
             preds = preds.argmax(dim=1).squeeze().numpy()
             labels = labels.squeeze().numpy().astype(np.int8)
-            predictions.append(preds), annotations.append(labels)
+            metrics = compute_segmentation_metrics(preds, labels, metrics)
+            del preds
+            del labels
             t.update()
-    return predictions, annotations
+    return metrics
 
 def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch=False):
     # I customize this for each project.
