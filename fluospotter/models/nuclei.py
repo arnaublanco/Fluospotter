@@ -8,7 +8,7 @@ from ..losses import combined_f1_rmse, f1_score, rmse
 from ._models import Model
 from ..networks.unet import CustomUNet
 from ..training import train_model, evaluate
-from ..io import check_configuration_file
+from ..io import check_configuration_file, save_metrics_csv
 from ..metrics import compute_segmentation_metrics
 from ..data import get_loaders_test, display_segmentation_metrics
 
@@ -23,6 +23,7 @@ class SegmentationModel(Model):
         self.network = CustomUNet(model_name=model_name, pretrained=pretrained, in_c=int(self.cfg["in_channels"]), n_classes=int(self.cfg["n_classes"]),
                                   patch_size=tuple(map(int, self.cfg["patch_size"].split('/')))).model
         self.model_name = model_name
+        self.pretrained = pretrained
 
     @property
     def metrics(self) -> list:
@@ -61,5 +62,6 @@ class SegmentationModel(Model):
                                         num_workers=int(self.cfg["num_workers"]),
                                         depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]), im_size=tuple(map(int, self.cfg["im_size"].split('/'))), instance_seg=bool(self.cfg["instance_seg"]))
         metrics = evaluate(self.network, test_loaders, self.cfg)
+        save_metrics_csv(self.pretrained, metrics)
         if display:
             display_segmentation_metrics(metrics)

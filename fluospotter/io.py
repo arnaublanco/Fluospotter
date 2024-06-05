@@ -3,6 +3,7 @@
 from typing import List, Tuple, Union, Dict, Any
 import os
 from tifffile import imread
+import pandas as pd
 
 # List of currently supported image file extensions.
 EXTENSIONS = ("tif", "tiff")
@@ -33,6 +34,17 @@ def check_configuration_file(cfg: Dict) -> Dict:
         if not (params[p] in cfg):
             cfg[params[p]] = values[p]
     return cfg
+
+
+def save_metrics_csv(path: str, metrics: Dict):
+    df = pd.DataFrame(metrics)
+    dir_path = os.path.dirname(path)
+    filename = "metrics.csv"
+    counter = 1
+    while os.path.exists(os.path.join(dir_path, filename)):
+        filename = "metrics_{}.csv".format(counter)
+        counter += 1
+    df.to_csv(os.path.join(dir_path, filename))
 
 
 def load_files(fname: str, training: bool = False) -> Dict[str, List[str]]:
