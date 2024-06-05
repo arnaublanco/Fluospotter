@@ -24,6 +24,7 @@ from .metrics import compute_segmentation_metrics
 from .util import monitor_ram_usage
 from skimage.measure import label
 from .data import match_labeling
+from sklearn.neighbors import KNeighborsClassifier
 
 import threading
 
@@ -122,7 +123,7 @@ def evaluate(model, loader, cfg, slwin_bs=2):
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = tuple(map(int, cfg["patch_size"].split('/')))
-    instance_seg = bool(cfg["instance_seg"])
+    instance_seg, knn = bool(cfg["instance_seg"]), bool(cfg["knn"])
     metrics = {}
     with trange(len(loader)) as t:
         for val_data in loader:
@@ -132,15 +133,35 @@ def evaluate(model, loader, cfg, slwin_bs=2):
             preds = preds.argmax(dim=1).squeeze().numpy()
             labels = labels.squeeze().numpy().astype(np.int8)
             if instance_seg:
+                borders = (preds == 1).astype(int)
                 preds = (preds == 2).astype(int)
                 preds = match_labeling(labels, label(preds))
-            pdb.set_trace()
+                if knn:
+                    preds = train_KNN(borders, preds)
+
             metrics = compute_segmentation_metrics(preds, labels, metrics)
             del preds
             del labels
             t.update()
 
     return metrics
+
+
+def train_KNN(borders: np.array, preds: np.array) -> np.array:
+    training_samples = []
+    for label in np.unique(preds):
+        x_coords, y_coords = np.where(preds == label)
+        training_samples.append(np.stack([x_coords, y_coords, label * np.ones_like(x_coords)], axis=1))
+    training_samples = np.vstack(training_samples)
+    x_train, y_train = training_samples[:, :2], training_samples[:, 2]
+    knn = KNeighborsClassifier(n_neighbors=1)
+    knn.fit(x_train, y_train)
+    x_test = np.stack(np.where(borders), axis=1)
+    y_pred = knn.predict(x_test)
+    borders = borders.astype(int)
+    borders[np.where(borders)] = y_pred
+    preds = preds + borders
+    return preds
 
 
 def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch=False):

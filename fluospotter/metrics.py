@@ -35,7 +35,6 @@ def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics:
             'tpr': [],
             'fpr': []
         }}
-
     matches = matched_segments(actual, predicted)
     pq, da, sq = panoptic_quality(actual, predicted, matches)
     metrics['object-wise']['detection_accuracy'].append(da)
@@ -61,7 +60,7 @@ def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics:
     return metrics
 
 
-def roc_auc(predicted: np.array, actual: np.array) -> (list, list, list):
+def roc_auc(predicted: np.array, actual: np.array) -> (float, list, list):
     ious = []
     for label in np.unique(actual)[1:]:
         actual_mask = (actual == label)
@@ -80,7 +79,12 @@ def roc_auc(predicted: np.array, actual: np.array) -> (list, list, list):
         tpr_list.append(tpr)
         fpr_list.append(fpr)
 
-    return auc(fpr_list, tpr_list), tpr_list, fpr_list
+    # Sort FPR and TPR
+    sorted_indices = np.argsort(fpr_list)
+    fpr_list_sorted = np.array(fpr_list)[sorted_indices]
+    tpr_list_sorted = np.array(tpr_list)[sorted_indices]
+
+    return auc(fpr_list_sorted, tpr_list_sorted), tpr_list_sorted.tolist(), fpr_list_sorted.tolist()
 
 
 def roc_auc_pixel(predicted: np.array, actual: np.array) -> (float, list, list):
@@ -94,16 +98,21 @@ def roc_auc_pixel(predicted: np.array, actual: np.array) -> (float, list, list):
     Returns:
         (float, list, list): AUC, TPR list, FPR list.
     """
+    # Assuming predicted is a probability map (float values), threshold it
+    if predicted.dtype != bool:
+        predicted = (predicted >= 0.5).astype(np.int8)
 
     iou_thresholds = np.linspace(0, 1, 101)
     tpr_list = []
     fpr_list = []
 
     for thr in iou_thresholds:
-        tp_thr = np.sum((actual == 1) & (predicted >= thr))
-        fp_thr = np.sum((actual == 0) & (predicted >= thr))
-        fn_thr = np.sum((actual == 1) & (predicted < thr))
-        tn_thr = np.sum((actual == 0) & (predicted < thr))
+        bin_pred = (predicted >= thr).astype(np.int8)
+
+        tp_thr = np.sum((actual == 1) & (bin_pred == 1))
+        fp_thr = np.sum((actual == 0) & (bin_pred == 1))
+        fn_thr = np.sum((actual == 1) & (bin_pred == 0))
+        tn_thr = np.sum((actual == 0) & (bin_pred == 0))
 
         # Calculate True Positive Rate (TPR) and False Positive Rate (FPR)
         tpr = tp_thr / (tp_thr + fn_thr + EPS)
@@ -112,10 +121,16 @@ def roc_auc_pixel(predicted: np.array, actual: np.array) -> (float, list, list):
         tpr_list.append(tpr)
         fpr_list.append(fpr)
 
-    # Compute AUC
-    roc_auc_score = auc(fpr_list, tpr_list)
+    # Sort FPR and TPR
+    sorted_indices = np.argsort(fpr_list)
+    fpr_list_sorted = np.array(fpr_list)[sorted_indices]
+    tpr_list_sorted = np.array(tpr_list)[sorted_indices]
 
-    return roc_auc_score, tpr_list, fpr_list
+    # Compute AUC
+    roc_auc_score = auc(fpr_list_sorted, tpr_list_sorted)
+
+    return roc_auc_score, tpr_list_sorted.tolist(), fpr_list_sorted.tolist()
+
 
 def iou(actual, predicted) -> float:
     """Calculates the Intersection over Union (IoU) score."""
@@ -187,23 +202,14 @@ def precision_recall_score(matches) -> (float, float):
     tp, fp, fn = 0, 0, 0
 
     for match in matches.values():
-        if len(match) == 2:
-            actual_match, predicted_match = match
-            if actual_match and predicted_match:
-                tp += 1
-            elif not actual_match and predicted_match:
-                fp += 1
-            elif actual_match and not predicted_match:
-                fn += 1
-        else:
-            if match:
-                actual_match = match[0]
-                if actual_match:
-                    fn += 1  # Ground truth exists, but prediction does not
+        if match:  # If match is not empty
+            for actual_match, iou_score in match:
+                if iou_score >= 0.5:  # Assuming IoU threshold of 0.5 for a positive match
+                    tp += 1
                 else:
-                    fp += 1  # Prediction exists, but ground truth does not
-            else:
-                fn += 1  # Neither ground truth nor prediction exists
+                    fp += 1
+        else:
+            fn += 1  # If there are no matches, it means a false negative
 
     precision = tp / (tp + fp + EPS)
     recall = tp / (tp + fn + EPS)

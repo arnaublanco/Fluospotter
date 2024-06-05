@@ -22,13 +22,13 @@ def check_configuration_file(cfg: Dict) -> Dict:
         "n_classes", "model_name", "pretrained", "loss1", "loss2",
         "alpha1", "alpha2", "batch_size", "acc_grad", "n_samples", "neg_samples",
         "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
-        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels"
+        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "knn"
     ]
     values = [
         2, "small_unet_3d", False, "ce", "dice",
         1.0, 1.0, 1, 4, 12, 1,
         4, "256/256/48", "adam", 3e-4, 20, 5,
-        True, "DSC", 0, False, 1]
+        True, "DSC", 0, False, 1, False]
 
     for p in range(len(params)):
         if not (params[p] in cfg):
@@ -39,11 +39,7 @@ def check_configuration_file(cfg: Dict) -> Dict:
 def save_metrics_csv(path: str, metrics: Dict):
     df = pd.DataFrame(metrics)
     dir_path = os.path.dirname(path)
-    filename = "metrics.csv"
-    counter = 1
-    while os.path.exists(os.path.join(dir_path, filename)):
-        filename = "metrics_{}.csv".format(counter)
-        counter += 1
+    filename = os.path.basename(os.path.splitext(path)[0]) + ".csv"
     df.to_csv(os.path.join(dir_path, filename))
 
 
