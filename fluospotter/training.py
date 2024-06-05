@@ -22,6 +22,8 @@ from .metrics import fast_bin_dice, fast_bin_auc
 from skimage.filters import threshold_otsu
 from .metrics import compute_segmentation_metrics
 from .util import monitor_ram_usage
+from skimage.measure import label
+from .data import match_labeling
 
 import threading
 
@@ -129,10 +131,10 @@ def evaluate(model, loader, cfg, slwin_bs=2):
             del images
             preds = preds.argmax(dim=1).squeeze().numpy()
             labels = labels.squeeze().numpy().astype(np.int8)
-            pdb.set_trace()
             if instance_seg:
                 preds = (preds == 2).astype(int)
-                labels = labels[1]
+                preds = match_labeling(labels, label(preds))
+            pdb.set_trace()
             metrics = compute_segmentation_metrics(preds, labels, metrics)
             del preds
             del labels

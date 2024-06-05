@@ -15,8 +15,8 @@ def permute_depth(x):
 
 def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,512), n_classes=2, depth_last=False, p_app=0.1, pr_geom=0.1, instance_seg=False):
     def add_custom_layers(transforms_list):
-        if instance_seg:
-            transforms_list.insert(1, t.Lambda(lambda d: {'img': d['img'], 'seg': (d['seg'] > 0).int()}))
+        if not instance_seg:
+            transforms_list.append(t.AsDiscreted(keys=('seg'), to_onehot=n_classes))
         if depth_last:
             transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
 
@@ -32,8 +32,7 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,5
         t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
         t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
         t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=1),
-        t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2),
-        t.AsDiscreted(keys=('seg'), to_onehot=n_classes)
+        t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=2)
     ]
 
     vl_transforms = [
@@ -41,8 +40,7 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,5
                             'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
         t.CropForegroundd(keys=('img', 'seg'), source_key='img', allow_smaller=False),
         t.ScaleIntensityd(keys=('img',)),
-        t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
-        t.AsDiscreted(keys=('seg'), to_onehot=n_classes)
+        t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest'))
     ]
 
     # Apply depth permutation if needed

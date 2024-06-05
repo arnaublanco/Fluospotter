@@ -37,7 +37,7 @@ def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics:
         }}
 
     matches = matched_segments(actual, predicted)
-    pq, da, sq = panoptic_quality(actual, predicted)
+    pq, da, sq = panoptic_quality(actual, predicted, matches)
     metrics['object-wise']['detection_accuracy'].append(da)
     metrics['object-wise']['segmentation_quality'].append(sq)
     metrics['object-wise']['panoptic_quality'].append(pq)
@@ -143,9 +143,8 @@ def matched_segments(actual, predicted, thr=0.5) -> Dict:
     return matches
 
 
-def panoptic_quality(actual, predicted) -> (float, float, float):
+def panoptic_quality(actual, predicted, matches) -> (float, float, float):
     tp, fp, fn = 0, 0, 0
-    matches = matched_segments(actual, predicted)
 
     matched_actual = set()
     matched_predicted = set()

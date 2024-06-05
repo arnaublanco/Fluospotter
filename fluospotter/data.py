@@ -247,18 +247,47 @@ def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_s
 
 
 def match_labeling(actual, predicted):
-    pdb.set_trace()
-    new_labels = predicted.copy()
-    for pred_label in range(np.unique(predicted)[1:]):
-        current = (predicted == pred_label)
-        new_label, prev_overlap = pred_label, 0
-        for actual_label in range(np.unique(actual)[1:]):
-            overlap = iou(actual == actual_label, current)
-            if overlap > prev_overlap:
-                prev_overlap = overlap
-                new_label = actual_label
-        new_labels[new_labels == pred_label] = new_label
-    return actual, new_labels
+    """
+    Relabels the predicted segmentation labels to match the ground truth labels
+    based on the highest Intersection over Union (IoU) overlap.
+
+    Args:
+        actual (np.array): Ground truth labels.
+        predicted (np.array): Predicted labels.
+
+    Returns:
+        np.array: Relabeled predicted labels.
+    """
+    new_labels = np.zeros_like(predicted)
+    used_labels = set()  # To keep track of labels that have already been used
+
+    # Iterate over each unique predicted label (ignoring the background label 0)
+    for pred_label in np.unique(predicted):
+        if pred_label == 0:
+            continue
+        current = (predicted == pred_label)  # Binary mask of current predicted label
+        best_label, best_overlap = None, 0  # Initialize with no best label and best overlap
+
+        # Iterate over each unique actual label (ignoring the background label 0)
+        for actual_label in np.unique(actual):
+            if actual_label == 0:
+                continue
+            overlap = iou(actual == actual_label, current)  # Compute IoU
+            if overlap > best_overlap and actual_label not in used_labels:  # If better overlap is found
+                best_overlap = overlap
+                best_label = actual_label
+
+        # If a matching label is found, use it; otherwise, assign a new unique label
+        if best_label is not None:
+            new_labels[predicted == pred_label] = best_label
+            used_labels.add(best_label)
+        else:
+            # Assign a new unique label that is not in used_labels
+            new_label = max(np.unique(actual)) + 1 if used_labels else 1
+            new_labels[predicted == pred_label] = new_label
+            used_labels.add(new_label)
+
+    return new_labels
 
 
 def display_segmentation_metrics(metrics: Dict):
