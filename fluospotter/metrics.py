@@ -27,42 +27,87 @@ def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics:
 
 
 def iou(actual, predicted) -> float:
-    tp, fp, fn = np.sum(actual == predicted), np.sum((actual == 1) & (predicted == 0)), np.sum((actual == 1) & (predicted == 0))
+    """Calculates the Intersection over Union (IoU) score."""
+    tp = np.sum((actual == 1) & (predicted == 1))
+    fp = np.sum((actual == 0) & (predicted == 1))
+    fn = np.sum((actual == 1) & (predicted == 0))
     return tp / (tp + fp + fn + EPS)
 
 
 def dice_coefficient(actual, predicted) -> float:
-    tp, fp, fn = np.sum(actual == predicted), np.sum((actual == 1) & (predicted == 0)), np.sum(
-        (actual == 1) & (predicted == 0))
-    return 2*tp / (2*tp + fp + fn)
-
-
-def panoptic_quality(actual, predicted) -> float:
-    tp, fp, fn, matches = 0, 0, 0, matched_segments(actual, predicted)
-    for m in matches.keys():
-        tp += int(matches[m][0] & matches[m][1])
-        fp += int((not matches[m][0]) & matches[m][1])
-        fn += int(matches[m][0] & (not matches[m][1]))
-    da, sq = tp/(tp + fp/2 + fn/2 + EPS), 0
-    for label in np.unique(actual)[1:]: sq += iou((actual == label), (predicted == label))
-    sq /= (tp + EPS)
-    return da*sq
-
-
-def precision_recall_score(matches) -> (float, float):
-    tp, fp, fn = 0, 0, 0
-    for m in matches.keys():
-        tp += int(matches[m][0] & matches[m][1])
-        fp += int((not matches[m][0]) & matches[m][1])
-        fn += int(matches[m][0] & (not matches[m][1]))
-    return tp/(tp + fp + EPS), tp/(tp + fn + EPS)
+    """Calculates the Dice Coefficient."""
+    tp = np.sum((actual == 1) & (predicted == 1))
+    fp = np.sum((actual == 0) & (predicted == 1))
+    fn = np.sum((actual == 1) & (predicted == 0))
+    return 2 * tp / (2 * tp + fp + fn + EPS)
 
 
 def matched_segments(actual, predicted, thr=0.5) -> Dict:
     matches = {}
-    for label in np.unique(actual)[1:]: matches[label] = [iou((actual == label), (predicted == label)) > thr]
-    for label in np.unique(predicted)[1:]: matches[label].append(iou((actual == label), (predicted == label)) > thr)
+    for label in np.unique(actual)[1:]:
+        actual_mask = (actual == label)
+        iou_scores = {pred_label: iou(actual_mask, (predicted == pred_label)) for pred_label in
+                      np.unique(predicted)[1:]}
+        matches[label] = [(pred_label, score) for pred_label, score in iou_scores.items() if score > thr]
     return matches
+
+
+def panoptic_quality(actual, predicted) -> float:
+    tp, fp, fn = 0, 0, 0
+    matches = matched_segments(actual, predicted)
+
+    matched_actual = set()
+    matched_predicted = set()
+
+    for actual_label, preds in matches.items():
+        if preds:
+            best_match = max(preds, key=lambda x: x[1])  # Choose the best IoU match
+            matched_actual.add(actual_label)
+            matched_predicted.add(best_match[0])
+            tp += 1
+
+    fp = len(np.unique(predicted)[1:]) - len(matched_predicted)
+    fn = len(np.unique(actual)[1:]) - len(matched_actual)
+
+    dq = tp / (tp + 0.5 * fp + 0.5 * fn + EPS)
+
+    sq = 0
+    for actual_label, preds in matches.items():
+        if preds:
+            best_match = max(preds, key=lambda x: x[1])
+            sq += best_match[1]
+
+    sq /= (tp + EPS)
+
+    return dq * sq
+
+
+def precision_recall_score(matches) -> (float, float):
+    tp, fp, fn = 0, 0, 0
+
+    for match in matches.values():
+        if len(match) == 2:
+            actual_match, predicted_match = match
+            if actual_match and predicted_match:
+                tp += 1
+            elif not actual_match and predicted_match:
+                fp += 1
+            elif actual_match and not predicted_match:
+                fn += 1
+        else:
+            if match:
+                actual_match = match[0]
+                if actual_match:
+                    fn += 1  # Ground truth exists, but prediction does not
+                else:
+                    fp += 1  # Prediction exists, but ground truth does not
+            else:
+                fn += 1  # Neither ground truth nor prediction exists
+
+    precision = tp / (tp + fp + EPS)
+    recall = tp / (tp + fn + EPS)
+
+    return precision, recall
 
 
 def fast_bin_auc(actual, predicted, partial=False):

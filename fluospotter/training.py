@@ -21,6 +21,9 @@ from .losses import get_loss
 from .metrics import fast_bin_dice, fast_bin_auc
 from skimage.filters import threshold_otsu
 from .metrics import compute_segmentation_metrics
+from .util import monitor_ram_usage
+
+import threading
 
 def init_tr_info():
     # I customize this function for each project.
@@ -114,6 +117,13 @@ def validate(model, loader, loss_fn, slwin_bs=2):
 
 
 def evaluate(model, loader, cfg, slwin_bs=2):
+
+    # Start the RAM usage monitoring thread
+    stop_event = threading.Event()
+    monitor_thread = threading.Thread(target=monitor_ram_usage, args=(stop_event,))
+    monitor_thread.daemon = True
+    monitor_thread.start()
+
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = tuple(map(int, cfg["patch_size"].split('/')))
@@ -129,6 +139,10 @@ def evaluate(model, loader, cfg, slwin_bs=2):
             del preds
             del labels
             t.update()
+
+    # Stop the monitoring thread
+    stop_event.set()
+    monitor_thread.join()
     return metrics
 
 def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch=False):
