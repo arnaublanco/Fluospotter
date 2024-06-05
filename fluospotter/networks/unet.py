@@ -1,4 +1,5 @@
 """UNet architecture."""
+import pdb
 
 import torch
 from monai.networks.nets import UNet, DynUNet
@@ -48,12 +49,13 @@ class CustomUNet:
 
     @staticmethod
     def get_model(model_name, in_c=1, n_classes=2, pretrained=None, patch_size=(64, 64, 16)):
+
         if model_name == 'small_unet_3d':
             model = UNet(spatial_dims=3, in_channels=in_c, out_channels=n_classes, channels=(16, 32,), strides=(2,),
                          num_res_units=1)
             if pretrained is not None:
                 try:
-                    model.load_state_dict(pretrained)
+                    model.load_state_dict(torch.load(pretrained))
                 except Exception:
                     raise ValueError(f'Could not load pretrained weights {pretrained} for small_unet_3d.')
         elif model_name == 'dynunet':
@@ -62,7 +64,7 @@ class CustomUNet:
             model = CustomUNet.get_dynunet(patch_size=patch_size, spacings=(5., 1., 1.), in_channels=in_c, n_classes=n_classes)
             if pretrained is not None:
                 try:
-                    model.load_state_dict(pretrained)
+                    model.load_state_dict(torch.load(pretrained))
                 except Exception:
                     raise ValueError(f'Could not load pretrained weights {pretrained} for dynunet.')
         else:

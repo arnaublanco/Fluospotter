@@ -10,21 +10,112 @@ from scipy.stats import rankdata
 from typing import Dict, Any
 from datasets import Dataset
 import pdb
+from sklearn.metrics import auc
 
 EPS = 1e-12
 
 
 def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics: Dict) -> Dict:
     if len(metrics) == 0:
-        metrics = {'iou': [], 'dice': [], 'panoptic_quality': [], 'precision': [], 'recall': []}
-    metrics['iou'].append(iou(actual, predicted))
-    metrics['dice'].append(dice_coefficient(actual, predicted))
+        metrics = {'pixel-wise': {
+            'iou': [],
+            'dice': [],
+            'precision': [],
+            'recall': [],
+            'roc_auc': [],
+            'tpr': [],
+            'fpr': []
+        }, 'object-wise': {
+            'detection_accuracy': [],
+            'segmentation_quality': [],
+            'panoptic_quality': [],
+            'precision': [],
+            'recall': [],
+            'roc_auc': [],
+            'tpr': [],
+            'fpr': []
+        }}
+
     matches = matched_segments(actual, predicted)
-    metrics['panoptic_quality'].append(panoptic_quality(actual, predicted))
+    pq, da, sq = panoptic_quality(actual, predicted)
+    metrics['object-wise']['detection_accuracy'].append(da)
+    metrics['object-wise']['segmentation_quality'].append(sq)
+    metrics['object-wise']['panoptic_quality'].append(pq)
     precision, recall = precision_recall_score(matches)
-    metrics['precision'].append(precision), metrics['recall'].append(recall)
+    metrics['object-wise']['precision'].append(precision), metrics['object-wise']['recall'].append(recall)
+    roc_auc_score, tpr_list, fpr_list = roc_auc(predicted, actual)
+    metrics['object-wise']['roc_auc'].append(roc_auc_score)
+    metrics['object-wise']['tpr'].append(tpr_list)
+    metrics['object-wise']['fpr'].append(fpr_list)
+
+    actual_bin, predicted_bin = (actual > 0).astype(np.int8), (predicted > 0).astype(np.int8)
+    metrics['pixel-wise']['iou'].append(iou(actual_bin, predicted_bin))
+    metrics['pixel-wise']['dice'].append(dice_coefficient(actual_bin, predicted_bin))
+    precision, recall = precision_recall_pixel_score(actual_bin, predicted_bin)
+    metrics['pixel-wise']['precision'].append(precision), metrics['pixel-wise']['recall'].append(recall)
+    roc_auc_score, tpr_list, fpr_list = roc_auc_pixel(predicted_bin, actual_bin)
+    metrics['pixel-wise']['roc_auc'].append(roc_auc_score)
+    metrics['pixel-wise']['tpr'].append(tpr_list)
+    metrics['pixel-wise']['fpr'].append(fpr_list)
+
     return metrics
 
+
+def roc_auc(predicted: np.array, actual: np.array) -> (list, list, list):
+    ious = []
+    for label in np.unique(actual)[1:]:
+        actual_mask = (actual == label)
+        ious.extend([iou(actual_mask, (predicted == pred_label)) for pred_label in np.unique(predicted)[1:]])
+
+    iou_thresholds = np.linspace(0, 1, 101)
+    tpr_list = []
+    fpr_list = []
+
+    for thr in iou_thresholds:
+        tp = np.sum(np.array(ious) >= thr)
+        fp = np.sum(np.array(ious) < thr)
+        fn = len(np.unique(actual)[1:]) - tp
+        tpr = tp / (tp + fn + EPS)
+        fpr = fp / (fp + len(np.unique(predicted)[1:]) - tp + EPS)
+        tpr_list.append(tpr)
+        fpr_list.append(fpr)
+
+    return auc(fpr_list, tpr_list), tpr_list, fpr_list
+
+
+def roc_auc_pixel(predicted: np.array, actual: np.array) -> (float, list, list):
+    """
+    Compute ROC AUC for semantic segmentation (pixel-wise).
+
+    Args:
+        predicted (np.array): Predicted binary mask (0's and 1's).
+        actual (np.array): Ground truth binary mask (0's and 1's).
+
+    Returns:
+        (float, list, list): AUC, TPR list, FPR list.
+    """
+
+    iou_thresholds = np.linspace(0, 1, 101)
+    tpr_list = []
+    fpr_list = []
+
+    for thr in iou_thresholds:
+        tp_thr = np.sum((actual == 1) & (predicted >= thr))
+        fp_thr = np.sum((actual == 0) & (predicted >= thr))
+        fn_thr = np.sum((actual == 1) & (predicted < thr))
+        tn_thr = np.sum((actual == 0) & (predicted < thr))
+
+        # Calculate True Positive Rate (TPR) and False Positive Rate (FPR)
+        tpr = tp_thr / (tp_thr + fn_thr + EPS)
+        fpr = fp_thr / (fp_thr + tn_thr + EPS)
+
+        tpr_list.append(tpr)
+        fpr_list.append(fpr)
+
+    # Compute AUC
+    roc_auc_score = auc(fpr_list, tpr_list)
+
+    return roc_auc_score, tpr_list, fpr_list
 
 def iou(actual, predicted) -> float:
     """Calculates the Intersection over Union (IoU) score."""
@@ -52,7 +143,7 @@ def matched_segments(actual, predicted, thr=0.5) -> Dict:
     return matches
 
 
-def panoptic_quality(actual, predicted) -> float:
+def panoptic_quality(actual, predicted) -> (float, float, float):
     tp, fp, fn = 0, 0, 0
     matches = matched_segments(actual, predicted)
 
@@ -79,7 +170,18 @@ def panoptic_quality(actual, predicted) -> float:
 
     sq /= (tp + EPS)
 
-    return dq * sq
+    return dq * sq, dq, sq
+
+
+def precision_recall_pixel_score(actual, predicted) -> (float, float):
+    tp = np.sum((actual == 1) & (predicted == 1))
+    fp = np.sum((actual == 0) & (predicted == 1))
+    fn = np.sum((actual == 1) & (predicted == 0))
+
+    precision = tp / (tp + fp + EPS)
+    recall = tp / (tp + fn + EPS)
+
+    return precision, recall
 
 
 def precision_recall_score(matches) -> (float, float):

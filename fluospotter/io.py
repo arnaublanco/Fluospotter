@@ -21,13 +21,13 @@ def check_configuration_file(cfg: Dict) -> Dict:
         "n_classes", "model_name", "pretrained", "loss1", "loss2",
         "alpha1", "alpha2", "batch_size", "acc_grad", "n_samples", "neg_samples",
         "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
-        "cyclical_lr", "metric", "num_workers", "depth_last"
+        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels"
     ]
     values = [
         2, "small_unet_3d", False, "ce", "dice",
         1.0, 1.0, 1, 4, 12, 1,
         4, "256/256/48", "adam", 3e-4, 20, 5,
-        True, "DSC", 0, False]
+        True, "DSC", 0, False, 1]
 
     for p in range(len(params)):
         if not (params[p] in cfg):

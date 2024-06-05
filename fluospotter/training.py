@@ -117,16 +117,10 @@ def validate(model, loader, loss_fn, slwin_bs=2):
 
 
 def evaluate(model, loader, cfg, slwin_bs=2):
-
-    # Start the RAM usage monitoring thread
-    stop_event = threading.Event()
-    monitor_thread = threading.Thread(target=monitor_ram_usage, args=(stop_event,))
-    monitor_thread.daemon = True
-    monitor_thread.start()
-
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = tuple(map(int, cfg["patch_size"].split('/')))
+    instance_seg = bool(cfg["instance_seg"])
     metrics = {}
     with trange(len(loader)) as t:
         for val_data in loader:
@@ -135,15 +129,17 @@ def evaluate(model, loader, cfg, slwin_bs=2):
             del images
             preds = preds.argmax(dim=1).squeeze().numpy()
             labels = labels.squeeze().numpy().astype(np.int8)
+            pdb.set_trace()
+            if instance_seg:
+                preds = (preds == 2).astype(int)
+                labels = labels[1]
             metrics = compute_segmentation_metrics(preds, labels, metrics)
             del preds
             del labels
             t.update()
 
-    # Stop the monitoring thread
-    stop_event.set()
-    monitor_thread.join()
     return metrics
+
 
 def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch=False):
     # I customize this for each project.

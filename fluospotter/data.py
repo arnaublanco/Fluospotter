@@ -12,7 +12,7 @@ from .augment import get_transforms_fullres, get_transforms_patches
 from .metrics import iou
 import pandas as pd
 import matplotlib.pyplot as plt
-
+from IPython.display import display
 
 def next_power(x: int, k: int = 2) -> int:
     """Calculate x's next higher power of k."""
@@ -235,10 +235,10 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(49, 512, 512)):
+def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(49, 512, 512), instance_seg=False):
     test_files = get_test_split(data_path, labels_path)
     _, test_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size,
-                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size)
+                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg)
     batch_size = 1
     gpu = torch.cuda.is_available()
     test_ds = md.Dataset(data=test_files, transform=test_transforms)
@@ -262,5 +262,34 @@ def match_labeling(actual, predicted):
 
 
 def display_segmentation_metrics(metrics: Dict):
-    tabular_data = pd.DataFrame(data=metrics)
-    print(tabular_data)
+    pixel_wise_metrics = {k: v for k, v in metrics['pixel-wise'].items() if k not in ['roc_auc', 'tpr', 'fpr']}
+    object_wise_metrics = {k: v for k, v in metrics['object-wise'].items() if k not in ['roc_auc', 'tpr', 'fpr']}
+
+    pixel_wise_df = pd.DataFrame(data=pixel_wise_metrics)
+    object_wise_df = pd.DataFrame(data=object_wise_metrics)
+
+    print("Pixel-wise Metrics:")
+    display(pixel_wise_df)
+
+    plot_roc_auc(metrics['pixel-wise']['tpr'], metrics['pixel-wise']['fpr'], metrics['pixel-wise']['roc_auc'],
+                 title='Pixel-wise ROC AUC')
+
+    print("\nObject-wise Metrics:")
+    display(object_wise_df)
+
+    plot_roc_auc(metrics['object-wise']['tpr'], metrics['object-wise']['fpr'], metrics['object-wise']['roc_auc'],
+                 title='Object-wise ROC AUC')
+
+
+def plot_roc_auc(tpr_list, fpr_list, roc_auc_list, title):
+    plt.figure()
+    for i in range(len(tpr_list)):
+        plt.plot(fpr_list[i], tpr_list[i], lw=2, label=f'ROC curve (area = {roc_auc_list[i]:0.2f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
+    plt.legend(loc="lower right")
+    plt.show()
