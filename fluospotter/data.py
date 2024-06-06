@@ -263,6 +263,7 @@ def match_labeling(actual, predicted):
 
     # Iterate over each unique predicted label (ignoring the background label 0)
     for pred_label in np.unique(predicted):
+        print("Label:",pred_label)
         if pred_label == 0:
             continue
         current = (predicted == pred_label)  # Binary mask of current predicted label

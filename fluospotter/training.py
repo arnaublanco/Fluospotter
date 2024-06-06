@@ -148,18 +148,25 @@ def evaluate(model, loader, cfg, slwin_bs=2):
 
 
 def train_KNN(borders: np.array, preds: np.array) -> np.array:
+    preds[borders != 0] = -1  # Mask out the border pixels by setting them to -1
     training_samples = []
-    for label in np.unique(preds):
-        x_coords, y_coords = np.where(preds == label)
-        training_samples.append(np.stack([x_coords, y_coords, label * np.ones_like(x_coords)], axis=1))
+    for l in np.unique(preds):
+        if l == -1:
+            continue
+        x_coords, y_coords, z_coords = np.where(preds == l)
+        training_samples.append(np.stack([x_coords, y_coords, z_coords, l * np.ones_like(x_coords)], axis=1))
+
     training_samples = np.vstack(training_samples)
-    x_train, y_train = training_samples[:, :2], training_samples[:, 2]
+    x_train, y_train = training_samples[:, :3], training_samples[:, 3]
+
     knn = KNeighborsClassifier(n_neighbors=1)
     knn.fit(x_train, y_train)
-    x_test = np.stack(np.where(borders), axis=1)
+
+    x_test = np.column_stack(np.where(borders))
     y_pred = knn.predict(x_test)
-    borders = borders.astype(int)
-    borders[np.where(borders)] = y_pred
+
+    borders[np.where(borders)] = y_pred.astype(int)
+
     preds = preds + borders
     return preds
 
