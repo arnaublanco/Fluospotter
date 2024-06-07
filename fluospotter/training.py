@@ -123,7 +123,6 @@ def evaluate(model, loader, cfg, slwin_bs=2):
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = tuple(map(int, cfg["patch_size"].split('/')))
-    instance_seg, knn = bool(cfg["instance_seg"]), bool(cfg["knn"])
     metrics = {}
     with trange(len(loader)) as t:
         for val_data in loader:
@@ -132,14 +131,16 @@ def evaluate(model, loader, cfg, slwin_bs=2):
             del images
             preds = preds.argmax(dim=1).squeeze().numpy()
             labels = labels.squeeze().numpy().astype(np.int8)
-            if instance_seg:
+            if bool(cfg["instance_seg"]):
                 borders = (preds == 1).astype(int)
                 preds = (preds == 2).astype(int)
                 preds = match_labeling(labels, label(preds))
-                if knn:
+                if bool(cfg["knn"]):
                     preds = train_KNN(borders, preds)
-
-            metrics = compute_segmentation_metrics(preds, labels, metrics)
+            if str(cfg["model_type"]) == "segmentation":
+                metrics = compute_segmentation_metrics(preds, labels, metrics)
+            else:
+                metrics = compute_puncta_metrics(preds, labels, metrics)
             del preds
             del labels
             t.update()

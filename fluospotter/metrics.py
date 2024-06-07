@@ -15,6 +15,33 @@ from sklearn.metrics import auc
 EPS = 1e-12
 
 
+def compute_puncta_metrics(predicted: np.array, actual: np.array, metrics: Dict) -> Dict:
+    if len(metrics) == 0:
+        metrics = {
+            'iou': [],
+            'dice': [],
+            'precision': [],
+            'recall': [],
+            'specificity': [],
+            'f1-score': [],
+            'roc_auc': [],
+            'tpr': [],
+            'fpr': [],
+            'mean_absolute_error': [],
+            'root_mean_squared_error': []
+        }
+    metrics['iou'].append(iou(actual, predicted))
+    metrics['dice'].append(dice_coefficient(actual, predicted))
+    precision, recall, specificity, f1_score_metric = precision_recall_specificity_f1_score_pixel_score(actual, predicted)
+    metrics['precision'].append(precision), metrics['recall'].append(recall), metrics['specificity'].append(specificity), metrics['f1-score'].append(f1_score_metric)
+    roc_auc_score, tpr_list, fpr_list = roc_auc_pixel(predicted, actual)
+    metrics['roc_auc'].append(roc_auc_score)
+    metrics['tpr'].append(tpr_list)
+    metrics['fpr'].append(fpr_list)
+
+    return metrics
+
+
 def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics: Dict) -> Dict:
     if len(metrics) == 0:
         metrics = {'pixel-wise': {
@@ -22,15 +49,19 @@ def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics:
             'dice': [],
             'precision': [],
             'recall': [],
+            'specificity': [],
+            "f1-score": [],
             'roc_auc': [],
             'tpr': [],
-            'fpr': []
+            'fpr': [],
         }, 'object-wise': {
             'detection_accuracy': [],
             'segmentation_quality': [],
             'panoptic_quality': [],
             'precision': [],
             'recall': [],
+            'specificity': [],
+            "f1-score": [],
             'roc_auc': [],
             'tpr': [],
             'fpr': []
@@ -40,8 +71,9 @@ def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics:
     metrics['object-wise']['detection_accuracy'].append(da)
     metrics['object-wise']['segmentation_quality'].append(sq)
     metrics['object-wise']['panoptic_quality'].append(pq)
-    precision, recall = precision_recall_score(matches)
+    precision, recall = precision_recall_specificity_f1_score_score(matches)
     metrics['object-wise']['precision'].append(precision), metrics['object-wise']['recall'].append(recall)
+    metrics['object-wise']['specificity'].append(precision), metrics['object-wise']['f1-score'].append(recall)
     roc_auc_score, tpr_list, fpr_list = roc_auc(predicted, actual)
     metrics['object-wise']['roc_auc'].append(roc_auc_score)
     metrics['object-wise']['tpr'].append(tpr_list)
@@ -50,8 +82,9 @@ def compute_segmentation_metrics(predicted: np.array, actual: np.array, metrics:
     actual_bin, predicted_bin = (actual > 0).astype(np.int8), (predicted > 0).astype(np.int8)
     metrics['pixel-wise']['iou'].append(iou(actual_bin, predicted_bin))
     metrics['pixel-wise']['dice'].append(dice_coefficient(actual_bin, predicted_bin))
-    precision, recall = precision_recall_pixel_score(actual_bin, predicted_bin)
+    precision, recall, specif, f1_score_metric = precision_recall_specificity_f1_score_pixel_score(actual_bin, predicted_bin)
     metrics['pixel-wise']['precision'].append(precision), metrics['pixel-wise']['recall'].append(recall)
+    metrics['pixel-wise']['specificity'].append(precision), metrics['pixel-wise']['f1-score'].append(recall)
     roc_auc_score, tpr_list, fpr_list = roc_auc_pixel(predicted_bin, actual_bin)
     metrics['pixel-wise']['roc_auc'].append(roc_auc_score)
     metrics['pixel-wise']['tpr'].append(tpr_list)
@@ -187,19 +220,22 @@ def panoptic_quality(actual, predicted, matches) -> (float, float, float):
     return dq * sq, dq, sq
 
 
-def precision_recall_pixel_score(actual, predicted) -> (float, float):
+def precision_recall_specificity_f1_score_pixel_score(actual, predicted) -> (float, float, float, float):
     tp = np.sum((actual == 1) & (predicted == 1))
     fp = np.sum((actual == 0) & (predicted == 1))
     fn = np.sum((actual == 1) & (predicted == 0))
+    tn = np.sum((actual == 0) & (predicted == 0))
 
     precision = tp / (tp + fp + EPS)
     recall = tp / (tp + fn + EPS)
+    specificity = tn / (tn + fp + EPS)
+    f1_score = 2 * precision * recall / (precision + recall + EPS)
 
-    return precision, recall
+    return precision, recall, specificity, f1_score
 
 
-def precision_recall_score(matches) -> (float, float):
-    tp, fp, fn = 0, 0, 0
+def precision_recall_specificity_f1_score_score(matches) -> (float, float, float, float):
+    tp, fp, fn, tn = 0, 0, 0, 0
 
     for match in matches.values():
         if match:  # If match is not empty
@@ -211,10 +247,18 @@ def precision_recall_score(matches) -> (float, float):
         else:
             fn += 1  # If there are no matches, it means a false negative
 
+    # Assuming the total number of instances is the sum of unique labels in both actual and predicted
+    total_actual_instances = len(matches)
+    total_predicted_instances = tp + fp
+
+    tn = total_actual_instances - tp
+
     precision = tp / (tp + fp + EPS)
     recall = tp / (tp + fn + EPS)
+    specificity = tn / (tn + fp + EPS)
+    f1_score = 2 * precision * recall / (precision + recall + EPS)
 
-    return precision, recall
+    return precision, recall, specificity, f1_score
 
 
 def fast_bin_auc(actual, predicted, partial=False):

@@ -9,8 +9,27 @@ import pandas as pd
 EXTENSIONS = ("tif", "tiff")
 
 
-def check_configuration_file(cfg: Dict) -> Dict:
-    """Ensures the configuration dictionary contains all necessary parameters.
+def check_puncta_configuration_file(cfg: Dict) -> Dict:
+    params = [
+        "model_name", "pretrained", "loss",
+        "alpha", "batch_size", "acc_grad", "n_samples", "neg_samples",
+        "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
+        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "detect_overlapping", "full_resolution"
+    ]
+    values = [
+        "small_unet_3d", False, "cedice",
+        1.0, 1, 4, 12, 1,
+        4, "48/256/256", "adam", 3e-4, 20, 5,
+        True, "DSC", 0, False, 1, False, False]
+
+    for p in range(len(params)):
+        if not (params[p] in cfg):
+            cfg[params[p]] = values[p]
+    return cfg
+
+
+def check_seg_configuration_file(cfg: Dict) -> Dict:
+    """Ensures the segmentation configuration dictionary contains all necessary parameters.
 
         Args:
             cfg: Configuration dictionary.
@@ -22,13 +41,13 @@ def check_configuration_file(cfg: Dict) -> Dict:
         "n_classes", "model_name", "pretrained", "loss1", "loss2",
         "alpha1", "alpha2", "batch_size", "acc_grad", "n_samples", "neg_samples",
         "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
-        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "knn"
+        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "knn", "full_resolution"
     ]
     values = [
         2, "small_unet_3d", False, "ce", "dice",
         1.0, 1.0, 1, 4, 12, 1,
-        4, "256/256/48", "adam", 3e-4, 20, 5,
-        True, "DSC", 0, False, 1, False]
+        4, "48/256/256", "adam", 3e-4, 20, 5,
+        True, "DSC", 0, False, 1, False, False]
 
     for p in range(len(params)):
         if not (params[p] in cfg):

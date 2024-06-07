@@ -45,44 +45,9 @@ class Model:
         """Return metrics."""
         return ["accuracy"]
 
-    def train(
-        self, dataset: Dataset, augment_val: bool = True, callbacks: list = None,
-    ) -> None:
+    def train(self, dataset: Dataset, **kwargs) -> None:
         """Training loop."""
-        if callbacks is None:
-            callbacks = []
-
-        #if not self.has_pre_model:
-        #    self.network.compile(
-        #        loss=self.loss_fn,
-        #        optimizer=self.optimizer_fn(float(self.train_args["learning_rate"])),
-        #        metrics=self.metrics,
-        #    )
-
-        #train_sequence = Dataset(
-        #    dataset.x_train,
-        #    dataset.y_train,
-        #    self.train_args["batch_size"],
-        #    format_fn=self.batch_format_fn,
-        #    augment_fn=self.batch_augment_fn,
-        #    overfit=self.train_args["overfit"],
-        #)
-
-        #valid_sequence = Dataset(
-        #    dataset.x_valid,
-        #    dataset.y_valid,
-        #    self.train_args["batch_size"],
-        #    format_fn=self.batch_format_fn,
-        #    augment_fn=self.batch_augment_fn if augment_val else None,
-        #)
-
-        #self.network.fit(
-        #    train_sequence,
-        #    epochs=self.train_args["epochs"],
-        #    callbacks=callbacks,
-        #    validation_data=valid_sequence,
-        #    shuffle=True,
-        #)
+        pass
 
     def evaluate(self, x: np.ndarray, y: np.ndarray) -> List[float]:
         """Evaluate on images / masks and return l2 norm and f1 score."""

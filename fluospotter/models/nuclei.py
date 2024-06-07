@@ -7,7 +7,7 @@ from ..datasets import Dataset
 from ._models import Model
 from ..networks.unet import CustomUNet
 from ..training import train_model, evaluate
-from ..io import check_configuration_file, save_metrics_csv
+from ..io import check_seg_configuration_file, save_metrics_csv
 from ..metrics import compute_segmentation_metrics
 from ..data import get_loaders_test, display_segmentation_metrics
 
@@ -18,7 +18,7 @@ class SegmentationModel(Model):
     def __init__(self, pretrained=None, model_name='small_unet_3d',
                  configuration={}, **kwargs):
         super().__init__(**kwargs)
-        self.cfg = check_configuration_file(configuration)
+        self.cfg = check_seg_configuration_file(configuration)
         self.network = CustomUNet(model_name=model_name, pretrained=pretrained, in_c=int(self.cfg["in_channels"]), n_classes=int(self.cfg["n_classes"]),
                                   patch_size=tuple(map(int, self.cfg["patch_size"].split('/')))).model
         self.model_name = model_name
@@ -33,9 +33,7 @@ class SegmentationModel(Model):
             combined_f1_rmse,
         ]
 
-    def train(
-            self, dataset: Dataset, augment_val: bool = True, callbacks: list = None,
-    ) -> None:
+    def train(self, dataset: Dataset, **kwargs) -> None:
         if not dataset.training:
             raise ValueError('Dataset does not contain training data.')
 
