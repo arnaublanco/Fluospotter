@@ -5,10 +5,7 @@ import datetime
 
 import numpy as np
 import torch
-
 from ..datasets import Dataset
-from ..losses import f1_score
-from ..losses import rmse
 
 DATESTRING = datetime.datetime.now().strftime("%Y%d%m_%H%M")
 

@@ -194,7 +194,7 @@ def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch
     return tr_info
 
 
-def train_segmentation_model(model, optimizer, acc_grad, loss_fn, bs, tr_loader, ovft_loader, vl_loader, scheduler, metric, n_epochs, vl_interval, save_path, multiclass=False):
+def train_segmentation_model(model, optimizer, acc_grad, loss_fn, bs, tr_loader, ovft_loader, vl_loader, scheduler, metric, n_epochs, vl_interval, save_path):
     best_metric, best_epoch = -1, 0
     tr_info = init_tr_info()
     for epoch in range(n_epochs):
@@ -210,7 +210,7 @@ def train_segmentation_model(model, optimizer, acc_grad, loss_fn, bs, tr_loader,
             print(s)
             with open(os.path.join(save_path, 'train_log.txt'), 'a') as f: print(s, file=f)
             # check if performance was better than anyone before and checkpoint if so
-            if metric =='DSC': curr_metric = tr_info['vl_dscs'][-1]
+            if metric == 'DSC': curr_metric = tr_info['vl_dscs'][-1]
             elif metric == 'AUC': curr_metric = tr_info['vl_aucs'][-1]
 
             if curr_metric > best_metric:
@@ -245,11 +245,18 @@ def train_model(
     else:
         save_path = os.path.join(dataset.data_dir, '../experiments')
 
+    counter = 1
     if model_type == "segmentation":
         save_path = os.path.join(save_path, 'segmentation')
+        while os.path.exists(os.path.join(save_path, 'experiment' + str(counter))):
+            counter += 1
+        save_path = os.path.join(save_path, 'experiment' + str(counter))
         labels_path = dataset.segmentation_dir
     elif model_type == "punctaDetection":
         save_path = os.path.join(save_path, 'punctaDetection')
+        while os.path.exists(os.path.join(save_path, 'experiment' + str(counter))):
+            counter += 1
+        save_path = os.path.join(save_path, 'experiment' + str(counter))
         labels_path = dataset.spots_dir
     else:
         raise ValueError("Model type {} not recognized".format(model_type))
@@ -302,7 +309,7 @@ def train_model(
 
     if model_type == "segmentation":
         tr_info = train_segmentation_model(model, optimizer, cfg["acc_grad"], loss_fn, int(cfg["batch_size"]), tr_loader, ovft_loader, vl_loader, scheduler,
-                          cfg["metric"], int(cfg["n_epochs"]), int(cfg["vl_interval"]), save_path, int(cfg["n_classes"]) > 1)
+                          cfg["metric"], int(cfg["n_epochs"]), int(cfg["vl_interval"]), save_path)
     end = time.time()
 
     hours, rem = divmod(end - start, 3600)

@@ -260,6 +260,7 @@ def match_labeling(actual, predicted):
     """
     new_labels = np.zeros_like(predicted)
     used_labels = set()  # To keep track of labels that have already been used
+    counter = 0
 
     # Iterate over each unique predicted label (ignoring the background label 0)
     for pred_label in np.unique(predicted):
@@ -274,19 +275,18 @@ def match_labeling(actual, predicted):
             if actual_label == 0:
                 continue
             overlap = iou(actual == actual_label, current)  # Compute IoU
-            if overlap > best_overlap and actual_label not in used_labels:  # If better overlap is found
+            if overlap > best_overlap:  # If better overlap is found
                 best_overlap = overlap
                 best_label = actual_label
 
         # If a matching label is found, use it; otherwise, assign a new unique label
         if best_label is not None:
             new_labels[predicted == pred_label] = best_label
-            used_labels.add(best_label)
         else:
             # Assign a new unique label that is not in used_labels
-            new_label = max(np.unique(actual)) + 1 if used_labels else 1
+            new_label = max(np.unique(actual)) + 1 + counter
+            counter += 1
             new_labels[predicted == pred_label] = new_label
-            used_labels.add(new_label)
 
     return new_labels
 
