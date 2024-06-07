@@ -78,7 +78,6 @@ def validate(model, loader, loss_fn, slwin_bs=2):
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = model.patch_size
-    # patch_size, slwin_bs = model.patch_size, 1
     dscs, aucs, losses = [], [], []
     with trange(len(loader)) as t:
         n_elems, running_dsc = 0, 0
@@ -92,21 +91,11 @@ def validate(model, loader, loss_fn, slwin_bs=2):
             labels = labels.squeeze().numpy().astype(np.int8)
 
             dsc_score, auc_score = [], []
-            #pdb.set_trace()
             for l in range(1,n_classes):
                 dsc_score.append(fast_bin_dice(labels[l], preds == l))
                 auc_score.append(fast_bin_auc(labels[l], preds == l, partial=True))
                 if np.isnan(dsc_score[l]): dsc_score[l] = 0
 
-            #preds = preds.sigmoid().squeeze().numpy()
-            #th = threshold_otsu(preds)
-            #preds = preds>th
-
-            #labels = labels.squeeze().numpy().astype(bool)
-            #dsc_score = fast_bin_dice(labels, preds)
-            #auc_score = fast_bin_auc(labels, preds, partial=True)
-
-            #if np.isnan(dsc_score): dsc_score = 0
             dscs.append(dsc_score)
             aucs.append(auc_score)
             losses.append(loss.item())
@@ -139,7 +128,7 @@ def evaluate(model, loader, cfg, slwin_bs=2):
                     preds = train_KNN(borders, preds)
             if str(cfg["model_type"]) == "segmentation":
                 metrics = compute_segmentation_metrics(preds, labels, metrics)
-            else:
+            elif str(cfg["model_type"]) == "puncta_detection":
                 metrics = compute_puncta_metrics(preds, labels, metrics)
             del preds
             del labels
@@ -195,7 +184,7 @@ def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch
     return tr_info
 
 
-def train_segmentation_model(model, optimizer, acc_grad, loss_fn, bs, tr_loader, ovft_loader, vl_loader, scheduler, metric, n_epochs, vl_interval, save_path):
+def start_training(model, optimizer, acc_grad, loss_fn, bs, tr_loader, ovft_loader, vl_loader, scheduler, metric, n_epochs, vl_interval, save_path):
     best_metric, best_epoch = -1, 0
     tr_info = init_tr_info()
     for epoch in range(n_epochs):
@@ -253,8 +242,8 @@ def train_model(
             counter += 1
         save_path = os.path.join(save_path, 'experiment' + str(counter))
         labels_path = dataset.segmentation_dir
-    elif model_type == "punctaDetection":
-        save_path = os.path.join(save_path, 'punctaDetection')
+    elif model_type == "puncta_detection":
+        save_path = os.path.join(save_path, 'puncta_detection')
         while os.path.exists(os.path.join(save_path, 'experiment' + str(counter))):
             counter += 1
         save_path = os.path.join(save_path, 'experiment' + str(counter))
@@ -263,15 +252,6 @@ def train_model(
         raise ValueError("Model type {} not recognized".format(model_type))
 
     os.makedirs(save_path, exist_ok=True)
-
-    #model_name = args.model_name
-    #optimizer_choice = args.optimizer
-    #lr, bs, ns, negs = args.lr, args.batch_size, args.n_samples, args.neg_samples
-    #n_epochs, vl_interval, metric = args.n_epochs, args.vl_interval, args.metric
-    #acc_grad, nw = args.acc_grad, args.num_workers
-
-    #patch_size = args.patch_size.split('/')
-    #patch_size = tuple(map(int, patch_size))
 
     print('* Instantiating a {} model for {}'.format(model.model_name, model_type))
     in_c = 1
@@ -308,8 +288,7 @@ def train_model(
     print('* Starting to train\n', '-' * 10)
     start = time.time()
 
-    if model_type == "segmentation":
-        tr_info = train_segmentation_model(model, optimizer, cfg["acc_grad"], loss_fn, int(cfg["batch_size"]), tr_loader, ovft_loader, vl_loader, scheduler,
+    tr_info = start_training(model, optimizer, cfg["acc_grad"], loss_fn, int(cfg["batch_size"]), tr_loader, ovft_loader, vl_loader, scheduler,
                           cfg["metric"], int(cfg["n_epochs"]), int(cfg["vl_interval"]), save_path)
     end = time.time()
 
