@@ -7,7 +7,8 @@ import torch
 from ..datasets import Dataset
 from ._models import Model
 from ..networks.unet import CustomUNet
-from ..training import train_model, evaluate
+from ..training import train_model
+from ..inference import evaluate
 from ..io import check_seg_configuration_file, save_metrics_csv
 from ..metrics import compute_segmentation_metrics
 from ..data import get_loaders_test, display_segmentation_metrics

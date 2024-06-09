@@ -62,6 +62,12 @@ def save_metrics_csv(path: str, metrics: Dict):
     df.to_csv(os.path.join(dir_path, filename))
 
 
+def load_metrics_csv(path: str) -> dict:
+    df = pd.read_csv(path)
+    metrics = df.to_dict(orient='list')
+    return metrics
+
+
 def load_files(fname: str, training: bool = False) -> Dict[str, List[str]]:
     """Imports data for custom training and inference.
 
@@ -151,43 +157,3 @@ def remove_extension(file_list):
             A set of file basenames without extensions.
     """
     return {os.path.basename(os.path.splitext(file)[0]) for file in file_list}
-
-'''
-def load_model(fname: Union[str, "os.PathLike[str]"]) -> tf.keras.models.Model:
-    """Import a deepBlink model from file."""
-    if not os.path.isfile(fname):
-        raise ValueError(f"File must exist - '{fname}' does not.")
-    if os.path.splitext(fname)[-1] != ".h5":
-        raise ValueError(f"File must be of type h5 - '{fname}' does not.")
-
-    try:
-        model = tf.keras.models.load_model(
-            fname,
-            custom_objects={
-                "combined_bce_rmse": combined_bce_rmse,
-                "combined_dice_rmse": combined_dice_rmse,
-                "combined_f1_rmse": combined_f1_rmse,
-                "f1_score": f1_score,
-                "leaky_relu": tf.nn.leaky_relu,
-                "rmse": rmse,
-            },
-        )
-        return model
-    except ValueError as error:
-        raise ImportError(f"Model '{fname}' could not be imported.") from error
-
-
-def load_prediction(fname: Union[str, "os.PathLike[str]"]) -> pd.DataFrame:
-    """Import a prediction file (output from deepBlink predict) as pandas dataframe."""
-    if not os.path.isfile(fname):
-        raise ValueError(f"File must exist - '{fname}' does not.")
-    df = pd.read_csv(fname)
-    if any([c in df.columns for c in ["x [µm]", "y [µm]"]]):
-        raise ValueError(
-            "Predictions must be in pixels, not microns. "
-            "Please use 'pixel-size' 1 in predict."
-        )
-    if not all([c in df.columns for c in ["x [px]", "y [px]"]]):
-        raise ValueError("Prediction file must contain columns 'x [px]' and 'y [px]'.")
-    return df
-'''

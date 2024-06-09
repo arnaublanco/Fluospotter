@@ -1,35 +1,21 @@
 """Training functions."""
-# pylint: disable=C0415
 
 from typing import Dict
 import datetime
 import os, os.path
-import platform
 import torch
 from tqdm import trange
-from .datasets import Dataset
-from .models import Model
-import numpy as np
-import random
-import time
-import json
-import pdb
-from monai.inferers import sliding_window_inference
 from .data import get_loaders
 from .optimizers import get_optimizer, get_scheduler
 from .losses import get_loss
-from .metrics import fast_bin_dice, fast_bin_auc
-from skimage.filters import threshold_otsu
-from .metrics import compute_segmentation_metrics
-from .util import monitor_ram_usage
-from skimage.measure import label
-from .data import match_labeling
 from sklearn.neighbors import KNeighborsClassifier
+from .inference import validate
+import numpy as np
+import random
+import time
 
-import threading
 
 def init_tr_info():
-    # I customize this function for each project.
     tr_info = dict()
     tr_info['tr_dscs'], tr_info['vl_dscs'] = [], []
     tr_info['tr_aucs'], tr_info['vl_aucs'] = [], []
@@ -74,69 +60,6 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
             t.update()
 
 
-def validate(model, loader, loss_fn, slwin_bs=2):
-    model.eval()
-    device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
-    patch_size = model.patch_size
-    dscs, aucs, losses = [], [], []
-    with trange(len(loader)) as t:
-        n_elems, running_dsc = 0, 0
-        for val_data in loader:
-            images, labels = val_data["img"].to(device), val_data["seg"]
-            n_classes = labels.shape[1]
-            preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
-            del images
-            loss = loss_fn(preds, labels)
-            preds = preds.argmax(dim=1).squeeze().numpy()
-            labels = labels.squeeze().numpy().astype(np.int8)
-
-            dsc_score, auc_score = [], []
-            for l in range(1,n_classes):
-                dsc_score.append(fast_bin_dice(labels[l], preds == l))
-                auc_score.append(fast_bin_auc(labels[l], preds == l, partial=True))
-                if np.isnan(dsc_score[l]): dsc_score[l] = 0
-
-            dscs.append(dsc_score)
-            aucs.append(auc_score)
-            losses.append(loss.item())
-            n_elems += 1
-            running_dsc += np.mean(dsc_score)
-            run_dsc = running_dsc / n_elems
-            t.set_postfix(DSC="{:.2f}".format(100 * run_dsc))
-            t.update()
-
-    return [100 * np.mean(np.array(dscs)), 100 * np.mean(np.array(aucs)), np.mean(np.array(losses))]
-
-
-def evaluate(model, loader, cfg, slwin_bs=2):
-    model.eval()
-    device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
-    patch_size = tuple(map(int, cfg["patch_size"].split('/')))
-    metrics = {}
-    with trange(len(loader)) as t:
-        for val_data in loader:
-            images, labels = val_data["img"].to(device), val_data["seg"]
-            preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
-            del images
-            preds = preds.argmax(dim=1).squeeze().numpy()
-            labels = labels.squeeze().numpy().astype(np.int8)
-            if bool(cfg["instance_seg"]):
-                borders = (preds == 1).astype(int)
-                preds = (preds == 2).astype(int)
-                preds = match_labeling(labels, label(preds))
-                if bool(cfg["knn"]):
-                    preds = train_KNN(borders, preds)
-            if str(cfg["model_type"]) == "segmentation":
-                metrics = compute_segmentation_metrics(preds, labels, metrics)
-            elif str(cfg["model_type"]) == "puncta_detection":
-                metrics = compute_puncta_metrics(preds, labels, metrics)
-            del preds
-            del labels
-            t.update()
-
-    return metrics
-
-
 def train_KNN(borders: np.array, preds: np.array) -> np.array:
     preds[borders != 0] = -1  # Mask out the border pixels by setting them to -1
     training_samples = []
@@ -162,9 +85,6 @@ def train_KNN(borders: np.array, preds: np.array) -> np.array:
 
 
 def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch=False):
-    # I customize this for each project.
-    # Here tr_info contains Dice Scores, AUCs, and loss values.
-    # Also, and vl_metrics contain (in this order) dice, auc and loss
     if best_epoch:
         tr_info['best_tr_dsc'] = tr_info['tr_dscs'][-1]
         tr_info['best_vl_dsc'] = tr_info['vl_dscs'][-1]
@@ -313,9 +233,6 @@ def train_model(
 
 
 def get_eval_string(tr_info, epoch, finished=False, vl_interval=1):
-    # I customize this function for each project.
-    # Pretty prints first three values of train/val metrics to a string and returns it
-    # Used also by the end of training (finished=True)
     ep_idx = len(tr_info['tr_dscs'])-1
     if finished:
         ep_idx = epoch
@@ -337,75 +254,3 @@ def set_seeds(seed_value, use_cuda):
         torch.cuda.manual_seed_all(seed_value)  # gpu vars
         torch.backends.cudnn.deterministic = True  # needed
         torch.backends.cudnn.benchmark = False
-
-
-'''
-def run_experiment(cfg: Dict, pre_model: tf.keras.models.Model = None):
-    """Run a training experiment.
-
-    Configuration file can be generated using deepblink config.
-
-    Args:
-        cfg: Dictionary configuration file.
-        pre_model: Pre-trained model if not training from scratch.
-    """
-    # Classes / functions
-    dataset_class = get_from_module("deepblink.datasets", cfg["dataset"])
-    model_class = get_from_module("deepblink.models", cfg["model"])
-    network_fn = get_from_module("deepblink.networks", cfg["network"])
-    optimizer_fn = get_from_module("deepblink.optimizers", cfg["optimizer"])
-    loss_fn = get_from_module("deepblink.losses", cfg["loss"])
-
-    # Arguments
-    augmentation_args = cfg.get("augmentation_args", {})
-    dataset_args = cfg.get("dataset_args", {})
-    dataset = dataset_class(**dataset_args)
-    network_args = (
-        cfg.get("network_args", {}) if cfg.get("network_args", {}) is not None else {}
-    )
-    network_args["cell_size"] = dataset_args["cell_size"]
-    train_args = cfg.get("train_args", {})
-
-    model = model_class(
-        augmentation_args=augmentation_args,
-        dataset_args=dataset_args,
-        dataset_cls=dataset,
-        loss_fn=loss_fn,
-        network_args=network_args,
-        network_fn=network_fn,
-        optimizer_fn=optimizer_fn,
-        train_args=train_args,
-        pre_model=pre_model,
-    )
-
-    cfg["system"] = {
-        "gpus": tf.config.list_logical_devices("GPU"),
-        "version": platform.version(),
-        "platform": platform.platform(),
-    }
-
-    now = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
-    run_name = f"{now}_{cfg['run_name']}"
-
-    use_wandb = cfg["use_wandb"]
-    if use_wandb:
-        try:
-            import wandb
-
-            if wandb.__version__ <= "0.10.03":
-                raise AssertionError
-        except (ModuleNotFoundError, AttributeError, AssertionError):
-            raise ImportError(
-                (
-                    "To support conda packages we don't ship deepBlink with wandb. "
-                    "Please install any using pip: 'pip install \"wandb>=0.10.3\"'"
-                )
-            )
-
-        # pylint:disable=E1101
-        wandb.init(name=run_name, project=cfg["name"], config=cfg)
-
-    model = train_model(model, dataset, cfg, run_name, use_wandb)
-
-    if use_wandb:
-        wandb.join()  # pylint:disable=E1101'''
