@@ -13,6 +13,8 @@ from .inference import validate
 import numpy as np
 import random
 import time
+from .models import Model
+from .datasets import Dataset
 
 
 def init_tr_info():
@@ -58,30 +60,6 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
 
             t.set_postfix(LOSS_lr="{:.4f}/{:.6f}".format(run_loss, lr))
             t.update()
-
-
-def train_KNN(borders: np.array, preds: np.array) -> np.array:
-    preds[borders != 0] = -1  # Mask out the border pixels by setting them to -1
-    training_samples = []
-    for l in np.unique(preds):
-        if l == -1:
-            continue
-        x_coords, y_coords, z_coords = np.where(preds == l)
-        training_samples.append(np.stack([x_coords, y_coords, z_coords, l * np.ones_like(x_coords)], axis=1))
-
-    training_samples = np.vstack(training_samples)
-    x_train, y_train = training_samples[:, :3], training_samples[:, 3]
-
-    knn = KNeighborsClassifier(n_neighbors=1)
-    knn.fit(x_train, y_train)
-
-    x_test = np.column_stack(np.where(borders))
-    y_pred = knn.predict(x_test)
-
-    borders[np.where(borders)] = y_pred.astype(int)
-
-    preds = preds + borders
-    return preds
 
 
 def set_tr_info(tr_info, epoch=0, ovft_metrics=None, vl_metrics=None, best_epoch=False):
@@ -134,6 +112,7 @@ def start_training(model, optimizer, acc_grad, loss_fn, bs, tr_loader, ovft_load
     del model, tr_loader, vl_loader
     torch.cuda.empty_cache()
     return tr_info
+
 
 def train_model(
     model: Model,

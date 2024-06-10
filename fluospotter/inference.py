@@ -1,7 +1,13 @@
 """Model prediction / inference functions."""
 
 import numpy as np
-import torch
+from tqdm import trange
+from monai.inferers import sliding_window_inference
+from .metrics import compute_segmentation_metrics, compute_puncta_metrics
+from .data import match_labeling
+from .metrics import fast_bin_auc, fast_bin_dice
+from skimage.measure import label
+from sklearn.neighbors import KNeighborsClassifier
 
 
 def validate(model, loader, loss_fn, slwin_bs=2):
@@ -65,3 +71,27 @@ def evaluate(model, loader, cfg, slwin_bs=2):
             t.update()
 
     return metrics
+
+
+def train_KNN(borders: np.array, preds: np.array) -> np.array:
+    preds[borders != 0] = -1  # Mask out the border pixels by setting them to -1
+    training_samples = []
+    for l in np.unique(preds):
+        if l == -1:
+            continue
+        x_coords, y_coords, z_coords = np.where(preds == l)
+        training_samples.append(np.stack([x_coords, y_coords, z_coords, l * np.ones_like(x_coords)], axis=1))
+
+    training_samples = np.vstack(training_samples)
+    x_train, y_train = training_samples[:, :3], training_samples[:, 3]
+
+    knn = KNeighborsClassifier(n_neighbors=1)
+    knn.fit(x_train, y_train)
+
+    x_test = np.column_stack(np.where(borders))
+    y_pred = knn.predict(x_test)
+
+    borders[np.where(borders)] = y_pred.astype(int)
+
+    preds = preds + borders
+    return preds
