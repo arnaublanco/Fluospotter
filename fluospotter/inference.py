@@ -1,6 +1,5 @@
 """Model prediction / inference functions."""
 import pdb
-
 import numpy as np
 from tqdm import trange
 from monai.inferers import sliding_window_inference
@@ -9,7 +8,6 @@ from .data import match_labeling
 from .metrics import fast_bin_auc, fast_bin_dice
 from skimage.measure import label
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn import svm
 from skimage.morphology import binary_opening
 import time
 
