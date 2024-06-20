@@ -23,7 +23,6 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,5
     tr_transforms = [
         t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
                             'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
-        t.CropForegroundd(keys=('img', 'seg'), source_key='seg', allow_smaller=False),
         t.ScaleIntensityd(keys=('img',)),
         t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
         t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
@@ -38,7 +37,6 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,5
     vl_transforms = [
         t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
                             'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
-        t.CropForegroundd(keys=('img', 'seg'), source_key='img', allow_smaller=False),
         t.ScaleIntensityd(keys=('img',)),
         t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest'))
     ]

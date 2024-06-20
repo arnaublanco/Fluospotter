@@ -1,5 +1,5 @@
 """Training functions."""
-
+import pdb
 from typing import Dict
 import datetime
 import os, os.path
@@ -117,9 +117,8 @@ def start_training(model, optimizer, acc_grad, loss_fn, bs, tr_loader, ovft_load
 def train_model(
     model: Model,
     dataset: Dataset,
-    model_type: str
+    refinement: bool = False
 ) -> None:
-    callbacks = []
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
 
@@ -135,32 +134,37 @@ def train_model(
         save_path = os.path.join(dataset.data_dir, '../experiments')
 
     counter = 1
-    if model_type == "segmentation":
+    if cfg["model_type"] == "segmentation":
         save_path = os.path.join(save_path, 'segmentation')
         while os.path.exists(os.path.join(save_path, 'experiment' + str(counter))):
             counter += 1
         save_path = os.path.join(save_path, 'experiment' + str(counter))
         labels_path = dataset.segmentation_dir
-    elif model_type == "puncta_detection":
+    elif cfg["model_type"] == "puncta_detection":
         save_path = os.path.join(save_path, 'puncta_detection')
         while os.path.exists(os.path.join(save_path, 'experiment' + str(counter))):
             counter += 1
         save_path = os.path.join(save_path, 'experiment' + str(counter))
         labels_path = dataset.spots_dir
     else:
-        raise ValueError("Model type {} not recognized".format(model_type))
+        raise ValueError("Model type {} not recognized".format(cfg["model_type"]))
 
     os.makedirs(save_path, exist_ok=True)
 
-    print('* Instantiating a {} model for {}'.format(model.model_name, model_type))
+    print('* Instantiating a {} model for {}'.format(model.model_name, cfg["model_type"]))
     in_c = 1
-    model = model.network
+    n_classes = int(cfg["n_classes"])
+    if refinement:
+        model = model.refinement
+        n_classes = 2
+    else:
+        model = model.network
     model = model.to(device)
     print('* Creating Dataloaders, batch size = {}, samples/vol = {}, workers = {}'.format(cfg["batch_size"], cfg["n_samples"], cfg["num_workers"]))
 
     tr_loader, ovft_loader, vl_loader = get_loaders(data_path=dataset.data_dir, labels_path=labels_path, n_samples=int(cfg["n_samples"]), neg_samples=int(cfg["neg_samples"]),
-                                                    patch_size=tuple(map(int, cfg["patch_size"].split('/'))), num_workers=int(cfg["num_workers"]), ovft_check=cfg["ovft_check"], depth_last=cfg["depth_last"],
-                                                    n_classes=int(cfg["n_classes"]))
+                                                    patch_size=tuple(map(int, cfg["patch_size"].split('/'))), num_workers=int(cfg["num_workers"]), ovft_check=int(cfg["ovft_check"]), depth_last=bool(cfg["depth_last"]),
+                                                    n_classes=n_classes)
 
     print("Total params: {0:,}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
     opt_cfg = {}

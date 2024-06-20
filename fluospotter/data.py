@@ -155,7 +155,7 @@ def get_test_split(data_path='data', labels_path='labels'):
     vol_list_test = os.listdir(data_test)
     seg_list_test = os.listdir(annotations_test)
     vol_list_test = [os.path.join(data_test, n) for n in vol_list_test]
-    seg_list_test= [os.path.join(annotations_test, n) for n in seg_list_test]
+    seg_list_test = [os.path.join(annotations_test, n) for n in seg_list_test]
     test_files = [{'img': img, 'seg': seg} for img, seg in zip(vol_list_test, seg_list_test)]
 
     return test_files
@@ -259,10 +259,10 @@ def match_labeling(actual, predicted):
         np.array: Relabeled predicted labels.
     """
     new_labels = np.zeros_like(predicted)
-    used_labels = set()  # To keep track of labels that have already been used
     counter = 0
 
     # Iterate over each unique predicted label (ignoring the background label 0)
+    print("Total predicted labels:",len(np.unique(predicted))-1, "Total real labels:", len(np.unique(actual))-1)
     for pred_label in np.unique(predicted):
         print("Label:",pred_label)
         if pred_label == 0:

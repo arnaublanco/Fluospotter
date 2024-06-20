@@ -11,7 +11,6 @@ from monai.losses import DiceLoss
 import warnings
 import pdb
 
-
 class CompoundLoss(nn.Module):
     def __init__(self, loss1, loss2=None, alpha1=1., alpha2=0.):
         super(CompoundLoss, self).__init__()
@@ -22,16 +21,14 @@ class CompoundLoss(nn.Module):
 
     def forward(self, y_pred, y_true, y_true_sk=None):
         if y_true_sk:
-            l1 = self.loss1(y_pred[:,1], y_true[:,1], y_true_sk)
-            l2 = self.loss2(y_pred[:,2:].squeeze(0), y_true[:,2:].squeeze(0), y_true_sk)
-        elif y_pred.shape[1] > 2:
-            l1 = self.loss1(y_pred[:,1], y_true[:,1])
-            l2 = self.loss2(y_pred[:,2:].squeeze(0), y_true[:,2:].squeeze(0))
+            l1 = self.loss1(y_pred, y_true, y_true_sk)
+            l2 = self.loss2(y_pred, y_true, y_true_sk)
         else:
-            l1 = self.loss1(y_pred[:,1], y_true[:,1])
-            l2 = self.loss2(y_pred[:,1], y_true[:,1])
+            l1 = self.loss1(y_pred, y_true)
+            l2 = self.loss2(y_pred, y_true)
+        if self.alpha2 == 0 or self.loss2 is None:
+            return self.alpha1*l1
         return self.alpha1*l1 + self.alpha2 * l2
-
 
 class DSCLoss(nn.Module):
     def __init__(self, include_background=False):
@@ -46,7 +43,6 @@ class DSCLoss(nn.Module):
                 warnings.warn('check you did not apply softmax before loss computation')
             else: self.check_softmax = False
         return self.loss(y_pred, y_true)
-
 
 class CELoss(nn.Module):
     def __init__(self):
@@ -102,8 +98,8 @@ class clDiceLoss(torch.nn.Module):
         y_pred = y_pred.softmax(dim=1)
         y_pred_sk = soft_skel(y_pred, self.iters)
         y_true_sk = soft_skel(y_true, self.iters)
-        tprec = (torch.sum(torch.multiply(y_pred_sk, y_true)[:, 1:, ...]) + self.smooth)/(torch.sum(y_pred_sk[:, 1:, ...]) + self.smooth)
-        tsens = (torch.sum(torch.multiply(y_true_sk, y_pred)[:, 1:, ...]) + self.smooth)/(torch.sum(y_true_sk[:, 1:, ...]) + self.smooth)
+        tprec = (torch.sum(torch.multiply(y_pred_sk, y_true)[:, 1, ...]) + self.smooth)/(torch.sum(y_pred_sk[:, 1, ...]) + self.smooth)
+        tsens = (torch.sum(torch.multiply(y_true_sk, y_pred)[:, 1, ...]) + self.smooth)/(torch.sum(y_true_sk[:, 1, ...]) + self.smooth)
         cl_dice = 1. - 2.0*(tprec*tsens)/(tprec+tsens)
         return cl_dice
 

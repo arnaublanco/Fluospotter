@@ -41,7 +41,7 @@ def check_seg_configuration_file(cfg: Dict) -> Dict:
         "n_classes", "model_name", "pretrained", "loss1", "loss2",
         "alpha1", "alpha2", "batch_size", "acc_grad", "n_samples", "neg_samples",
         "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
-        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "knn", "full_resolution", "instance_seg"
+        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "refinement", "full_resolution", "instance_seg"
     ]
     values = [
         2, "small_unet_3d", False, "ce", "dice",
