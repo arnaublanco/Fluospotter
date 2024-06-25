@@ -131,7 +131,7 @@ def load_folder(fname: str) -> List[str]:
     return files
 
 
-def validate_data_and_labels(data: Dict[str, List[str]], labels: Dict[str, List[str]]) -> bool:
+def validate_data_and_labels(data: Dict[str, List[str]], labels: Dict[str, List[str]], training: bool = True) -> bool:
     """Validates that data and label files match in their basename (excluding extensions).
 
         Args:
@@ -141,7 +141,11 @@ def validate_data_and_labels(data: Dict[str, List[str]], labels: Dict[str, List[
         Returns:
             True if data and label files match, False otherwise.
     """
-    for key in ['train', 'valid', 'test']:
+    if training:
+        keys = ['train', 'valid', 'test']
+    else:
+        keys = ['test']
+    for key in keys:
         if remove_extension(data[key]) != remove_extension(labels[key]):
             return False
     return True

@@ -8,9 +8,7 @@ import monai.data as md
 from torch.utils.data.dataset import Subset
 from .augment import get_transforms_fullres, get_transforms_patches
 from .metrics import iou
-import pandas as pd
-import matplotlib.pyplot as plt
-from IPython.display import display
+
 
 def get_test_split(data_path='data', labels_path='labels'):
     data_test = os.path.join(data_path, 'test')
@@ -110,6 +108,24 @@ def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_s
     return test_loader
 
 
+def join_connected_puncta(data, mask):
+    out = np.zeros_like(mask, dtype=np.int8)
+    labels = np.unique(mask)
+    for l in labels[1:]:  # Skip label 0 (background)
+        mask_label = mask == l
+        if not np.any(mask_label):  # Skip empty masks
+            continue
+        # Find the index of the maximum value in the component
+        max_idx = np.argmax(data[mask_label])
+        # Create a mask with the maximum value position set to True
+        max_pos_mask = np.zeros_like(mask_label)
+        max_pos_mask[np.nonzero(mask_label)[0][max_idx],
+                     np.nonzero(mask_label)[1][max_idx],
+                     np.nonzero(mask_label)[2][max_idx]] = True
+        out[max_pos_mask] = 1  # Set this position to 1 in the output mask
+    return out
+
+
 def match_labeling(actual, predicted):
     """
     Relabels the predicted segmentation labels to match the ground truth labels
@@ -153,37 +169,3 @@ def match_labeling(actual, predicted):
             new_labels[predicted == pred_label] = new_label
 
     return new_labels
-
-
-def display_segmentation_metrics(metrics: Dict):
-    pixel_wise_metrics = {k: v for k, v in metrics['pixel-wise'].items() if k not in ['roc_auc', 'tpr', 'fpr']}
-    object_wise_metrics = {k: v for k, v in metrics['object-wise'].items() if k not in ['roc_auc', 'tpr', 'fpr']}
-
-    pixel_wise_df = pd.DataFrame(data=pixel_wise_metrics)
-    object_wise_df = pd.DataFrame(data=object_wise_metrics)
-
-    print("Pixel-wise Metrics:")
-    display(pixel_wise_df)
-
-    plot_roc_auc(metrics['pixel-wise']['tpr'], metrics['pixel-wise']['fpr'], metrics['pixel-wise']['roc_auc'],
-                 title='Pixel-wise ROC AUC')
-
-    print("\nObject-wise Metrics:")
-    display(object_wise_df)
-
-    plot_roc_auc(metrics['object-wise']['tpr'], metrics['object-wise']['fpr'], metrics['object-wise']['roc_auc'],
-                 title='Object-wise ROC AUC')
-
-
-def plot_roc_auc(tpr_list, fpr_list, roc_auc_list, title):
-    plt.figure()
-    for i in range(len(tpr_list)):
-        plt.plot(fpr_list[i], tpr_list[i], lw=2, label=f'ROC curve (area = {roc_auc_list[i]:0.2f})')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title(title)
-    plt.legend(loc="lower right")
-    plt.show()

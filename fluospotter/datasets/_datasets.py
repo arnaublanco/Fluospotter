@@ -32,7 +32,7 @@ class Dataset:
         # Load and validate segmentation labels if available
         if self.segmentation_dir is not None:
             labels_seg = load_files(self.segmentation_dir, self.training)
-            if not validate_data_and_labels(data, labels_seg):
+            if not validate_data_and_labels(data, labels_seg, self.training):
                 raise ValueError("Data files and segmentation annotations do not coincide.")
             if self.training:
                 self.y_seg_train, self.y_seg_valid, self.y_seg_test = labels_seg["train"], labels_seg["valid"], labels_seg["test"]
@@ -42,7 +42,7 @@ class Dataset:
         # Load and validate spots labels if available
         if self.spots_dir is not None:
             labels_spots = load_files(self.spots_dir, self.training)
-            if not validate_data_and_labels(data, labels_spots):
+            if not validate_data_and_labels(data, labels_spots, self.training):
                 raise ValueError("Data files and spots annotations do not coincide.")
             if self.training:
                 self.y_spots_train, self.y_spots_valid, self.y_spots_test = labels_spots["train"], labels_spots["valid"], labels_spots["test"]

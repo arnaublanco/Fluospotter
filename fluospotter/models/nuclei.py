@@ -26,6 +26,8 @@ class SegmentationModel(Model):
         if refinement:
             self.refinement = CustomUNet(model_name=model_name, pretrained=refinement, in_c=int(self.cfg["in_channels"]), n_classes=2,
                                   patch_size=tuple(map(int, self.cfg["patch_size"].split('/')))).model
+        else:
+            self.refinement = None
         self.model_name = model_name
         self.pretrained = pretrained
 

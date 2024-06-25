@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import trange
 from monai.inferers import sliding_window_inference
 from .metrics import compute_segmentation_metrics, compute_puncta_metrics
-from .data import match_labeling
+from .data import match_labeling, join_connected_puncta
 from .metrics import fast_bin_auc, fast_bin_dice
 from skimage.measure import label
 from sklearn.neighbors import KNeighborsClassifier
@@ -57,10 +57,15 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
     out = {}
     with trange(len(loader)) as t:
         for val_data in loader:
+            start_time = time.time()
             images, labels = val_data["img"].to(device), val_data["seg"]
             preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
             preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
             labels = labels.squeeze().numpy().astype(np.int8)
+            if str(cfg["model_type"]) == "puncta_detection":
+                preds = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(preds, connectivity=3))
+                labels = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(labels[1], connectivity=3))
+            if labels.shape[0] != preds.shape[0]: labels = labels.argmax(0)
             if bool(cfg["instance_seg"]):
                 preds = (preds == 2).astype(int)
                 preds = binary_opening(preds)
@@ -70,9 +75,10 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
                     binary_mask = binary_mask.argmax(dim=1).squeeze().numpy().astype(np.int8)
                     preds = train_knn(binary_mask, preds)
                     del binary_mask
+            print("Elapsed time:", time.time() - start_time, "seconds")
             if compute_metrics:
-                preds = match_labeling(labels, preds)
                 if str(cfg["model_type"]) == "segmentation":
+                    preds = match_labeling(labels, preds)
                     out = compute_segmentation_metrics(preds, labels, out)
                 elif str(cfg["model_type"]) == "puncta_detection":
                     out = compute_puncta_metrics(preds, labels, out)

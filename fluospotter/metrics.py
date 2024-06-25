@@ -1,11 +1,10 @@
 """Functions to calculate training loss on single image."""
-
+import pdb
 from typing import List, Optional, Tuple, Union
 import warnings
 
 import numpy as np
-import pandas as pd
-import scipy.optimize
+from scipy.spatial import cKDTree
 from scipy.stats import rankdata
 from typing import Dict
 
@@ -15,22 +14,17 @@ EPS = 1e-12
 def compute_puncta_metrics(predicted: np.array, actual: np.array, metrics: Dict) -> Dict:
     if len(metrics) == 0:
         metrics = {
-            'iou': [],
-            'dice': [],
             'precision': [],
             'recall': [],
-            'specificity': [],
             'f1-score': [],
-            'roc_auc': [],
-            'tpr': [],
-            'fpr': [],
-            'mean_absolute_error': [],
-            'root_mean_squared_error': []
+            'number_peaks': [],
+            'ground_truth': []
         }
-    metrics['iou'].append(iou(actual, predicted))
-    metrics['dice'].append(dice_coefficient(actual, predicted))
-    precision, recall, specificity, f1_score_metric = precision_recall_specificity_f1_score_pixel_score(actual, predicted)
-    metrics['precision'].append(precision), metrics['recall'].append(recall), metrics['specificity'].append(specificity), metrics['f1-score'].append(f1_score_metric)
+    predicted, actual = mask_to_coords_conversion(predicted), mask_to_coords_conversion(actual)
+    precision, recall, f1_score_metric = precision_recall_f1_score_coordinates(actual, predicted)
+    metrics['precision'].append(precision), metrics['recall'].append(recall), metrics['f1-score'].append(f1_score_metric)
+    metrics['number_peaks'].append(len(predicted))
+    metrics['ground_truth'].append(len(actual))
 
     return metrics
 
@@ -145,6 +139,27 @@ def precision_recall_specificity_f1_score_pixel_score(actual, predicted) -> (flo
     f1_score = 2 * precision * recall / (precision + recall + EPS)
 
     return precision, recall, specificity, f1_score
+
+
+def mask_to_coords_conversion(mask):
+    z, y, x = np.where(mask > 0)
+    coords = list(zip(z, y, x))
+    return np.array(coords)
+
+
+def precision_recall_f1_score_coordinates(actual, predicted, threshold=3) -> (float, float, float):
+    differences = np.abs(actual[:, None] - predicted)
+    below_threshold = np.all(differences < threshold, axis=-1)
+
+    tp = np.sum(np.any(below_threshold, axis=1))
+    fp = np.sum(np.logical_not(np.any(below_threshold, axis=0)))
+    fn = np.sum(np.logical_not(np.any(below_threshold, axis=1)))
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    return precision, recall, f1_score
 
 
 def precision_recall_f1_score(matches: Dict[int, List[Tuple[int, float]]]) -> Tuple[float, float, float]:
