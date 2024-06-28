@@ -10,10 +10,19 @@ def permute_depth(x):
     return torch.permute(x, [0, 2, 3, 1])
 
 
-def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,512), n_classes=2, depth_last=False, p_app=0.1, pr_geom=0.1, instance_seg=False):
+def custom_transform(d):
+    img = torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0)
+    if 'seg' in d and d['seg']:
+        seg = torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)
+        return {'img': img, 'seg': seg}
+    else:
+        return {'img': img}
+
+
+def get_transforms_patches(n_samples, neg_samples, patch_size, im_size, n_classes=2, depth_last=False, p_app=0.1, pr_geom=0.1, instance_seg=False):
     def add_custom_layers(transforms_list):
         if not instance_seg:
-            transforms_list.append(t.AsDiscreted(keys=('seg'), to_onehot=n_classes))
+            transforms_list.append(t.AsDiscreted(keys=('seg'), to_onehot=n_classes, allow_missing_keys=True))
         if depth_last:
             transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
 
@@ -32,10 +41,9 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size=(49,512,5
     ]
 
     vl_transforms = [
-        t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                            'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+        t.Lambda(custom_transform),
         t.ScaleIntensityd(keys=('img',)),
-        t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest'))
+        t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest'), allow_missing_keys=True)
     ]
 
     # Apply depth permutation if needed

@@ -10,15 +10,18 @@ from .augment import get_transforms_fullres, get_transforms_patches
 from .metrics import iou
 
 
-def get_test_split(data_path='data', labels_path='labels'):
+def get_test_split(data_path='data', labels_path=''):
     data_test = os.path.join(data_path, 'test')
-    annotations_test = os.path.join(labels_path, 'test')
-
     vol_list_test = os.listdir(data_test)
-    seg_list_test = os.listdir(annotations_test)
     vol_list_test = [os.path.join(data_test, n) for n in vol_list_test]
-    seg_list_test = [os.path.join(annotations_test, n) for n in seg_list_test]
-    test_files = [{'img': img, 'seg': seg} for img, seg in zip(vol_list_test, seg_list_test)]
+
+    if len(labels_path) > 0:
+        annotations_test = os.path.join(labels_path, 'test')
+        seg_list_test = os.listdir(annotations_test)
+        seg_list_test = [os.path.join(annotations_test, n) for n in seg_list_test]
+        test_files = [{'img': img, 'seg': seg} for img, seg in zip(vol_list_test, seg_list_test)]
+    else:
+        test_files = [{'img': img, 'seg': ''} for img in zip(vol_list_test)]
 
     return test_files
 
@@ -97,7 +100,7 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(49, 512, 512), instance_seg=False):
+def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(48, 512, 512), instance_seg=False):
     test_files = get_test_split(data_path, labels_path)
     _, test_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size,
                                                           depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg)

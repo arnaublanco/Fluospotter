@@ -38,11 +38,12 @@ class SegmentationModel(Model):
         train_model(dataset=dataset, model=self, refinement=refinement)
 
     def predict(self, dataset: Dataset) -> None:
-        data_path, labels_path = dataset.segmentation_data_test()
-        test_loaders = get_loaders_test(data_path=data_path, labels_path=labels_path,
+        test_loaders = get_loaders_test(data_path=dataset.data_dir, labels_path='',
                                         n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
+                                        im_size=tuple(map(int, self.cfg["im_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
+                                        instance_seg=bool(self.cfg["instance_seg"]),
                                         depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]))
         predictions = evaluate(self, test_loaders, compute_metrics=False)
         return predictions

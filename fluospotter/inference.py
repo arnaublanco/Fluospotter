@@ -58,14 +58,19 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
     with trange(len(loader)) as t:
         for val_data in loader:
             start_time = time.time()
-            images, labels = val_data["img"].to(device), val_data["seg"]
+            images = val_data["img"].to(device)
+            if 'seg' in val_data:
+                labels = val_data["seg"]
+            else:
+                labels = None
             preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
             preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
-            labels = labels.squeeze().numpy().astype(np.int8)
+            if labels is not None: labels = labels.squeeze().numpy().astype(np.int8)
             if str(cfg["model_type"]) == "puncta_detection":
                 preds = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(preds, connectivity=3))
-                labels = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(labels[1], connectivity=3))
-            if labels.shape[0] != preds.shape[0]: labels = labels.argmax(0)
+                if labels is not None: labels = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(labels[1], connectivity=3))
+            if labels is not None:
+                if labels.shape[0] != preds.shape[0]: labels = labels.argmax(0)
             if bool(cfg["instance_seg"]):
                 preds = (preds == 2).astype(int)
                 preds = binary_opening(preds)
@@ -77,10 +82,10 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
                     del binary_mask
             print("Elapsed time:", time.time() - start_time, "seconds")
             if compute_metrics:
-                if str(cfg["model_type"]) == "segmentation":
+                if str(cfg["model_type"]) == "segmentation" and labels is not None:
                     preds = match_labeling(labels, preds)
                     out = compute_segmentation_metrics(preds, labels, out)
-                elif str(cfg["model_type"]) == "puncta_detection":
+                elif str(cfg["model_type"]) == "puncta_detection" and labels is not None:
                     out = compute_puncta_metrics(preds, labels, out)
             else:
                 if len(out) == 0: out['seg'] = []

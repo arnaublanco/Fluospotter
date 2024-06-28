@@ -37,9 +37,9 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
     n_opt_iters = 0
     with trange(len(tr_loader)) as t:
         step, n_elems, running_loss = 0, 0, 0
-        for (i_batch, batch_data) in enumerate(tr_loader):  # load 1 scan from the training set
-            n_samples = len(batch_data['seg'])  # nr of px x py x pz patches (see args.n_samples)
-            for m in range(0, n_samples, bs):  # we loop over batch_data picking up bs patches at a time
+        for (i_batch, batch_data) in enumerate(tr_loader):
+            n_samples = len(batch_data['seg'])
+            for m in range(0, n_samples, bs):
                 step += bs
                 inputs, labels = (batch_data['img'][m:(m+bs)].to(device), batch_data['seg'][m:(m+bs)].to(device))
                 outputs = model(inputs)
@@ -47,7 +47,6 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
                 loss = loss / acc_grad
                 loss.backward()
                 if ((n_opt_iters + 1) % acc_grad == 0) or (n_opt_iters + 1 == len(tr_loader)):
-                    # Update Optimizer
                     optimizer.step()
                     optimizer.zero_grad()
                 n_opt_iters += 1
@@ -55,7 +54,7 @@ def train_one_epoch(model, tr_loader, bs, acc_grad, loss_fn, optimizer, schedule
                 scheduler.step()
                 optimizer.zero_grad()
                 running_loss += loss.detach().item() * inputs.shape[0]
-                n_elems += inputs.shape[0]  # total nr of items processed
+                n_elems += inputs.shape[0]
                 run_loss = running_loss / n_elems
 
             t.set_postfix(LOSS_lr="{:.4f}/{:.6f}".format(run_loss, lr))
