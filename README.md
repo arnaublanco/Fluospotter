@@ -46,4 +46,6 @@ Additionally for GPU support, install torch-gpu through pip and with the appropr
 
 ## Acknowledgements
 
-This Python library is the result of my Master's thesis titled "...", from the Computational Biomedical Engineering master's degree at Universitat Pompeu Fabra, Barcelona. I would like to thank my supervisors David Castillo and Adrián Galdrán (@agaldran), and the Acuity Spatial Genomics team to make this possible.
+This Python library is the result of my Master's thesis titled <i>"Fluospotter: an end-to-end pipeline for
+nuclei segmentation and puncta detection
+in fluorescence microscopy"</i>, from the Computational Biomedical Engineering master's degree at Universitat Pompeu Fabra, Barcelona. I would like to thank my supervisors David Castillo and Adrián Galdrán (@agaldran), and the Acuity Spatial Genomics team to make this possible.
