@@ -4,6 +4,7 @@ setup(
     name='fluospotter',
     version='0.1',
     packages=find_packages(),
+    license="CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
     install_requires=[
         'numpy',
         'torch',
