@@ -55,7 +55,7 @@ cfg = {
     "refinement": True,
 }
 
-seg_model = SegmentationModel(pretrained=True, configuration=cfg)
+seg_model = SegmentationModel(pretrained="model.pth", refinement="refinement.pth", configuration=cfg)
 
 prediction = seg_model.predict(data)
 ```
