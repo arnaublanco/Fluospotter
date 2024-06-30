@@ -26,7 +26,7 @@ Fluospotter addresses these challenges by automatically finding puncta without t
 
 ## Documentation
 
-More documentation about fluospotter including how to train, create a dataset, is available at https://github.com/arnaublanco/fluospotter/tree/master/tutorial.
+More documentation about fluospotter including how to train, create a dataset, etc. will be provided soon.
 
 ## Installation
 
