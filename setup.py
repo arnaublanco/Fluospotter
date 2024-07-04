@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='fluospotter',
-    version='0.1',
+    version='0.2',
     packages=find_packages(),
     license="CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
     install_requires=[
