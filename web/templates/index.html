@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <title>Fluospotter | Web</title>
+</head>
+<body>
+    <div class="menu">
+        <div class="menu-items">
+            <div class="menu-item">
+                <a href="#file">File</a>
+                <div class="dropdown">
+                    <a href="#">New...</a>
+                    <a href="#">Open...</a>
+                </div>
+            </div>
+            <div class="menu-item">
+                <a href="#edit">Edit</a>
+                <div class="dropdown">
+                    <a href="#">Undo</a>
+                    <a href="#">Redo</a>
+                </div>
+            </div>
+            <div class="menu-item">
+                <a href="#view">View</a>
+                <div class="dropdown">
+                    <a href="#">Option 1</a>
+                    <a href="#">Option 2</a>
+                    <a href="#">Option 3</a>
+                </div>
+            </div>
+            <div class="menu-item">
+                <a href="#help">Help</a>
+                <div class="dropdown">
+                    <a href="#">Tutorials</a>
+                    <a href="#">Contact</a>
+                </div>
+            </div>
+        </div>
+        <div class="logo">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Fluospotter Logo">
+        </div>
+        <div class="menu-title">Fluospotter | Web interface</div>
+    </div>
+    <div class="content">
+        <h1>Welcome to Fluospotter Web Interface</h1>
+    </div>
+</body>
+</html>
