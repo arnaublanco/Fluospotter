@@ -8,4 +8,5 @@ from .unet import CustomUNet
 
 __all__ = [
     "unet",
+    "resnet"
 ]
