@@ -11,7 +11,7 @@ setup(
         'monai',
         'scikit-image',
         'scikit-learn',
-        'tqdm'
+        'tqdm',
         'tifffile',
         'pandas'
     ],
