@@ -19,6 +19,15 @@ def custom_transform(d):
         return {'img': img}
 
 
+def custom_transform_numpy(d):
+    img = torch.as_tensor(d['img'].astype(np.float32)).unsqueeze(0)
+    if 'seg' in d and d['seg']:
+        seg = torch.as_tensor(d['seg'].astype(np.int8)).unsqueeze(0)
+        return {'img': img, 'seg': seg}
+    else:
+        return {'img': img}
+
+
 def get_transforms_patches(n_samples, neg_samples, patch_size, im_size, n_classes=2, depth_last=False, p_app=0.1, pr_geom=0.1, instance_seg=False, is_numpy=False):
     def add_custom_layers(transforms_list):
         if not instance_seg:
@@ -26,9 +35,13 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size, n_classe
         if depth_last:
             transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
 
+    if is_numpy:
+        lambda_transform = t.Lambda(lambda d: custom_transform_numpy(d))
+    else:
+        lambda_transform = t.Lambda(lambda d: custom_transform(d))
+
     tr_transforms = [
-        t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-                            'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
+        lambda_transform,
         t.ScaleIntensityd(keys=('img',)),
         t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
         t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
@@ -41,7 +54,7 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size, n_classe
     ]
 
     vl_transforms = [
-        t.Lambda(custom_transform),
+        lambda_transform,
         t.ScaleIntensityd(keys=('img',)),
         t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest'), allow_missing_keys=True)
     ]

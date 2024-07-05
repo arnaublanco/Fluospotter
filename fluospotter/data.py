@@ -110,7 +110,7 @@ def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_s
     else:
         test_files = get_test_split(data_path, labels_path)
     _, test_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size,
-                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg)
+                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg, is_numpy=is_numpy)
     batch_size = 1
     gpu = torch.cuda.is_available()
     test_ds = md.Dataset(data=test_files, transform=test_transforms)
