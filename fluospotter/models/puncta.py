@@ -42,6 +42,7 @@ class SpotsModel(Model):
         return preds
 
     def predict_image(self, dataset: np.array) -> None:
+        return {}
         test_loaders = get_loaders_test(data_path=dataset, labels_path='',
                                         n_samples=int(self.cfg["n_samples"]),
                                         neg_samples=int(self.cfg["neg_samples"]),

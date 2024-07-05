@@ -26,23 +26,13 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size, n_classe
         if depth_last:
             transforms_list.insert(1, t.Lambda(lambda d: {'img': permute_depth(d['img']), 'seg': permute_depth(d['seg'])}))
 
-    if is_numpy:
-        lambda_transform = t.Lambda(lambda d: {
-            'img': torch.as_tensor(d['img'].astype(np.float32)).unsqueeze(0),
-            'seg': torch.as_tensor(d['seg'].astype(np.int8)).unsqueeze(0)
-        })
-    else:
-        lambda_transform = t.Lambda(lambda d: {
-            'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
-            'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)
-        })
-
     tr_transforms = [
-        lambda_transform,
+        t.Lambda(lambda d: {'img': torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0),
+                            'seg': torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)}),
         t.ScaleIntensityd(keys=('img',)),
         t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest')),
         t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
-                               num_samples=n_samples, pos=1, neg=neg_samples),
+                                 num_samples=n_samples, pos=1, neg=neg_samples),
         t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
         t.RandShiftIntensityd(keys=('img',), offsets=0.05, prob=p_app),
         t.RandFlipd(keys=('img', 'seg'), prob=pr_geom, spatial_axis=0),
@@ -51,7 +41,7 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size, n_classe
     ]
 
     vl_transforms = [
-        lambda_transform,
+        t.Lambda(custom_transform),
         t.ScaleIntensityd(keys=('img',)),
         t.Resized(spatial_size=im_size, keys=('img', 'seg'), mode=('bilinear', 'nearest'), allow_missing_keys=True)
     ]
