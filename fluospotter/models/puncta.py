@@ -33,7 +33,7 @@ class SpotsModel(Model):
         train_model(dataset=dataset, model=self)
 
     def predict(self, dataset: Dataset) -> None:
-        test_loaders = get_loaders_test(data_path=dataset.data_dir, labels_path=dataset.spots_dir,
+        test_loaders = get_loaders_test(data_path=dataset.data_dir, labels_path='',
                                         n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
@@ -42,7 +42,7 @@ class SpotsModel(Model):
         return preds
 
     def predict_image(self, dataset: np.array) -> None:
-        test_loaders = get_loaders_test(data_path=dataset, labels_path=dataset.spots_dir,
+        test_loaders = get_loaders_test(data_path=dataset, labels_path='',
                                         n_samples=int(self.cfg["n_samples"]),
                                         neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
