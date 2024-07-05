@@ -46,18 +46,18 @@ Additionally for GPU support, install torch-gpu through pip and with the appropr
 from fluospotter.models import SegmentationModel
 from fluospotter.datasets import Dataset
 
-data = Dataset(segmentation_dir="segmentation_data")
+data = Dataset(data_dir="testing_data")
 
 cfg = {
-    "im_size": "48/512/512",
     "patch_size": "48/256/256",
-    "instance_seg": True,
-    "refinement": True,
+    "n_classes": "3",
+    "im_size": "48/512/512",
+    "instance_seg": "True",
+    "refinement": "True"
 }
 
-seg_model = SegmentationModel(pretrained="model.pth", refinement="refinement.pth", configuration=cfg)
-
-prediction = seg_model.predict(data)
+model = SegmentationModel(model_name="dynunet", configuration=cfg, pretrained="model.pth", refinement="refinement.pth")
+prediction = model.predict(data)
 ```
 
 ## Acknowledgements
