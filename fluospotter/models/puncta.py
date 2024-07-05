@@ -9,6 +9,7 @@ from ..training import train_model
 from ..inference import evaluate
 from ..io import check_puncta_configuration_file, save_metrics_csv
 from ..data import get_loaders_test
+import numpy as np
 
 
 class SpotsModel(Model):
@@ -37,7 +38,18 @@ class SpotsModel(Model):
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
                                         depth_last=bool(self.cfg["depth_last"]), n_classes=2)
-        evaluate(self, test_loaders, compute_metrics=False)
+        preds = evaluate(self, test_loaders, compute_metrics=False)
+        return preds
+
+    def predict_image(self, dataset: np.array) -> None:
+        test_loaders = get_loaders_test(data_path=dataset, labels_path=dataset.spots_dir,
+                                        n_samples=int(self.cfg["n_samples"]),
+                                        neg_samples=int(self.cfg["neg_samples"]),
+                                        patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
+                                        num_workers=int(self.cfg["num_workers"]),
+                                        depth_last=bool(self.cfg["depth_last"]), n_classes=2, is_numpy=True)
+        preds = evaluate(self, test_loaders, compute_metrics=False)
+        return preds
 
     def evaluate(self, dataset: Dataset, display: bool = True) -> None:
         test_loaders = get_loaders_test(data_path=dataset.data_dir, labels_path=dataset.spots_dir,

@@ -57,7 +57,6 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
     out = {}
     with trange(len(loader)) as t:
         for val_data in loader:
-            start_time = time.time()
             images = val_data["img"].to(device)
             if 'seg' in val_data:
                 labels = val_data["seg"]
@@ -80,7 +79,6 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
                     binary_mask = binary_mask.argmax(dim=1).squeeze().numpy().astype(np.int8)
                     preds = train_knn(binary_mask, preds)
                     del binary_mask
-            print("Elapsed time:", time.time() - start_time, "seconds")
             if compute_metrics:
                 if str(cfg["model_type"]) == "segmentation" and labels is not None:
                     preds = match_labeling(labels, preds)

@@ -10,7 +10,8 @@ setup(
         'torch',
         'monai',
         'scikit-image',
-        'sklearn',
+        'scikit-learn',
+        'tqdm'
         'tifffile',
         'pandas'
     ],
