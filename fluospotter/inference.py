@@ -116,9 +116,12 @@ def evaluate_puncta(model, loader, slwin_bs=2, compute_metrics=False):
             if compute_metrics and labels is not None:
                 out = compute_puncta_metrics(preds, labels, out)
             else:
-                if len(out) == 0: out['seg'] = []
+                if len(out) == 0:
+                    out['puncta'] = []
+                    if bool(cfg["overlapping_puncta"]) and model_refine: out['overlapping_puncta'] = []
                 positions = np.argwhere(preds == 1)
-                out['seg'].append(positions)
+                out['puncta'].append(positions)
+                if bool(cfg["overlapping_puncta"]) and model_refine: out['overlapping_puncta'].append(overlapping_peak)
             del images
             del preds
             del labels
