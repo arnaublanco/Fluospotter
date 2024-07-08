@@ -10,6 +10,7 @@ from skimage.measure import label
 from sklearn.neighbors import KNeighborsClassifier
 from skimage.morphology import binary_opening
 import time
+import torch
 
 
 def validate(model, loader, loss_fn, slwin_bs=2):
@@ -47,8 +48,15 @@ def validate(model, loader, loss_fn, slwin_bs=2):
 
 
 def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
-    if model.refinement:
-        model_refine = model.refinement
+    if model.cfg["model_type"] == "segmentation":
+        out = evaluate_seg(model, loader, compute_metrics=compute_metrics)
+    elif model.cfg["model_type"] == "puncta_detection":
+        out = evaluate_puncta(model, loader, compute_metrics=compute_metrics)
+    return out
+
+
+def evaluate_puncta(model, loader, slwin_bs=2, compute_metrics=False):
+    model_refine = model.refinement if model.refinement else None
     cfg = model.cfg
     model = model.network
     model.eval()
@@ -58,17 +66,82 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
     with trange(len(loader)) as t:
         for val_data in loader:
             images = val_data["img"].to(device)
-            if 'seg' in val_data:
-                labels = val_data["seg"]
-            else:
-                labels = None
+            labels = val_data["seg"] if 'seg' in val_data else None
             preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
             preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
             if labels is not None: labels = labels.squeeze().numpy().astype(np.int8)
-            if str(cfg["model_type"]) == "puncta_detection":
-                preds = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(preds, connectivity=3))
-                if labels is not None: labels = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(labels[1], connectivity=3))
+            preds = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(preds, connectivity=3))
+            if labels is not None: labels = join_connected_puncta(images.cpu().detach().numpy()[0][0], label(labels[1], connectivity=3))
+            if bool(cfg["overlapping_puncta"]) and model_refine:
+                positions = np.argwhere(preds == 1)
+                crop_size = 14
+                images = images.squeeze(axis=(0,1))
+                cropped_volume = np.zeros((positions.shape[0],crop_size,crop_size))
+                for i in range(positions.shape[0]):
+                    z, x, y = positions[i]
+                    x_start = max(0, x - crop_size // 2)
+                    y_start = max(0, y - crop_size // 2)
+                    x_end = min(images.shape[1], x + crop_size // 2)
+                    y_end = min(images.shape[2], y + crop_size // 2)
+                    if x_end - x_start < crop_size:
+                        x_start = max(0, x_end - crop_size)
+                        x_end = min(images.shape[1], x_start + crop_size)
+                    if y_end - y_start < crop_size:
+                        y_start = max(0, y_end - crop_size)
+                        y_end = min(images.shape[2], y_start + crop_size)
+                    cropped_volume[i] = images[z, x_start:x_end, y_start:y_end]
+
+                cropped_volume = torch.tensor(cropped_volume, dtype=torch.float32).unsqueeze(1)
+                mean = cropped_volume.mean(dim=(1, 2), keepdim=True)
+                std = cropped_volume.std(dim=(1, 2), keepdim=True)
+                cropped_volume = (cropped_volume - mean) / std
+                refined_preds = model_refine(cropped_volume)
+                overlapping_peak = refined_preds[0].softmax(dim=1).detach().cpu().numpy()
+                overlapping_peak = np.argmax(overlapping_peak, axis=1)
+                corrected_pos = 13 * torch.nn.functional.sigmoid(refined_preds[1])
+                corrected_pos = np.round(corrected_pos.detach().cpu().numpy()).astype(int)
+                for i in range(positions.shape[0]):
+                    z, x, y = positions[i, 0], positions[i, 1], positions[i, 2]
+                    if overlapping_peak[i]:
+                        x_start = max(0, x - crop_size // 2)
+                        y_start = max(0, y - crop_size // 2)
+                        x_end = min(images.shape[1], x + crop_size // 2)
+                        y_end = min(images.shape[2], y + crop_size // 2)
+                        if x_end - x_start < crop_size: x_start = max(0, x_end - crop_size)
+                        if y_end - y_start < crop_size: y_start = max(0, y_end - crop_size)
+                        preds[z,x,y] = 0
+                        preds[z,x_start + corrected_pos[i][0], y_start + corrected_pos[i][1]] = 1
+                        preds[z, x_start + corrected_pos[i][2], y_start + corrected_pos[i][3]] = 1
+
+            if compute_metrics and labels is not None:
+                out = compute_puncta_metrics(preds, labels, out)
+            else:
+                if len(out) == 0: out['seg'] = []
+                positions = np.argwhere(preds == 1)
+                out['seg'].append(positions)
+            del images
+            del preds
+            del labels
+            t.update()
+    return out
+
+
+def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False):
+    model_refine = model.refinement if model.refinement else None
+    cfg = model.cfg
+    model = model.network
+    model.eval()
+    device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
+    patch_size = tuple(map(int, cfg["patch_size"].split('/')))
+    out = {}
+    with trange(len(loader)) as t:
+        for val_data in loader:
+            images = val_data["img"].to(device)
+            labels = val_data["seg"] if 'seg' in val_data else None
+            preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
+            preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
             if labels is not None:
+                labels = labels.squeeze().numpy().astype(np.int8)
                 if labels.shape[0] != preds.shape[0]: labels = labels.argmax(0)
             if bool(cfg["instance_seg"]):
                 preds = (preds == 2).astype(int)
@@ -79,12 +152,9 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
                     binary_mask = binary_mask.argmax(dim=1).squeeze().numpy().astype(np.int8)
                     preds = train_knn(binary_mask, preds)
                     del binary_mask
-            if compute_metrics:
-                if str(cfg["model_type"]) == "segmentation" and labels is not None:
-                    preds = match_labeling(labels, preds)
-                    out = compute_segmentation_metrics(preds, labels, out)
-                elif str(cfg["model_type"]) == "puncta_detection" and labels is not None:
-                    out = compute_puncta_metrics(preds, labels, out)
+            if compute_metrics and labels is not None:
+                preds = match_labeling(labels, preds)
+                out = compute_segmentation_metrics(preds, labels, out)
             else:
                 if len(out) == 0: out['seg'] = []
                 out['seg'].append(preds)
@@ -92,7 +162,6 @@ def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
             del preds
             del labels
             t.update()
-
     return out
 
 

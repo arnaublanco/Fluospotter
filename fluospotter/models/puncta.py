@@ -5,6 +5,7 @@ import pdb
 from ..datasets import Dataset
 from ._models import Model
 from ..networks.unet import CustomUNet
+from ..networks.resnet import CustomResNet
 from ..training import train_model
 from ..inference import evaluate
 from ..io import check_puncta_configuration_file, save_metrics_csv
@@ -15,7 +16,7 @@ import numpy as np
 class SpotsModel(Model):
     """Class to predict spot localization; see base class."""
 
-    def __init__(self, pretrained=None, model_name='small_unet_3d',
+    def __init__(self, pretrained=None, overlapping_puncta=None, model_name='small_unet_3d',
                  configuration={}, **kwargs):
         super().__init__(**kwargs)
         self.cfg = check_puncta_configuration_file(configuration)
@@ -23,7 +24,10 @@ class SpotsModel(Model):
         self.network = CustomUNet(model_name=model_name, pretrained=pretrained, in_c=int(self.cfg["in_channels"]), n_classes=2,
                                   patch_size=tuple(map(int, self.cfg["patch_size"].split('/')))).model
         self.model_name = model_name
-        self.refinement = None
+        if overlapping_puncta:
+            self.refinement = CustomResNet(model_name="overlapping_puncta", pretrained=overlapping_puncta, in_c=int(self.cfg["in_channels"]), n_classes=2).model
+        else:
+            self.refinement = overlapping_puncta
         self.pretrained = pretrained
 
     def train(self, dataset: Dataset, **kwargs) -> None:
@@ -37,7 +41,7 @@ class SpotsModel(Model):
                                         n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
-                                        depth_last=bool(self.cfg["depth_last"]), n_classes=2)
+                                        depth_last=bool(self.cfg["depth_last"]), im_size=tuple(map(int, self.cfg["im_size"].split('/'))), n_classes=2)
         preds = evaluate(self, test_loaders, compute_metrics=False)
         return preds
 
@@ -47,7 +51,7 @@ class SpotsModel(Model):
                                         neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
-                                        depth_last=bool(self.cfg["depth_last"]), n_classes=2, is_numpy=True)
+                                        depth_last=bool(self.cfg["depth_last"]), n_classes=2, im_size=tuple(map(int, self.cfg["im_size"].split('/'))), is_numpy=True)
         preds = evaluate(self, test_loaders, compute_metrics=False)
         return preds
 
@@ -56,6 +60,6 @@ class SpotsModel(Model):
                                         n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
                                         num_workers=int(self.cfg["num_workers"]),
-                                        depth_last=bool(self.cfg["depth_last"]), n_classes=2, im_size=tuple(map(int, self.cfg["im_size"].split('/'))), instance_seg=bool(self.cfg["instance_seg"]))
+                                        depth_last=bool(self.cfg["depth_last"]), n_classes=2, im_size=tuple(map(int, self.cfg["im_size"].split('/'))))
         metrics = evaluate(self, test_loaders, compute_metrics=True)
         save_metrics_csv(self.pretrained, metrics)

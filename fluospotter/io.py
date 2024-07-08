@@ -9,12 +9,17 @@ import pandas as pd
 EXTENSIONS = ("tif", "tiff")
 
 
+def get_extension(filename):
+    file_extension = os.path.splitext(filename)[1]
+    return file_extension
+
+
 def check_puncta_configuration_file(cfg: Dict) -> Dict:
     params = [
         "model_name", "pretrained", "loss",
         "alpha", "batch_size", "acc_grad", "n_samples", "neg_samples",
         "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
-        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "detect_overlapping", "full_resolution"
+        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "overlapping_puncta", "full_resolution"
     ]
     values = [
         "small_unet_3d", False, "cedice",

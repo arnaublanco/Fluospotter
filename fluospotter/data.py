@@ -121,18 +121,18 @@ def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_s
 def join_connected_puncta(data, mask):
     out = np.zeros_like(mask, dtype=np.int8)
     labels = np.unique(mask)
-    for l in labels[1:]:  # Skip label 0 (background)
+    for l in labels[1:]:
         mask_label = mask == l
-        if not np.any(mask_label):  # Skip empty masks
+        if not np.any(mask_label):
             continue
-        # Find the index of the maximum value in the component
+
         max_idx = np.argmax(data[mask_label])
-        # Create a mask with the maximum value position set to True
+
         max_pos_mask = np.zeros_like(mask_label)
         max_pos_mask[np.nonzero(mask_label)[0][max_idx],
                      np.nonzero(mask_label)[1][max_idx],
                      np.nonzero(mask_label)[2][max_idx]] = True
-        out[max_pos_mask] = 1  # Set this position to 1 in the output mask
+        out[max_pos_mask] = 1
     return out
 
 
