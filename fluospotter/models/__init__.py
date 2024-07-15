@@ -4,4 +4,4 @@ from ._models import Model
 from .nuclei import SegmentationModel
 from .puncta import SpotsModel
 
-__all__ = ["Model", "segmentation", "puncta_detection"]
+__all__ = ["Model", "nuclei", "puncta"]
