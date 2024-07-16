@@ -77,10 +77,10 @@ def get_loaders_fullres(data_path, batch_size=1, im_size=(96, 96, 64), num_worke
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, ovft_check=0, depth_last=False, n_classes=2):
+def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, ovft_check=0, depth_last=False, n_classes=2, im_size=(48,512,512)):
 
     tr_files, vl_files = get_train_val_test_splits(data_path, labels_path)
-    tr_transforms, vl_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size, depth_last=depth_last, n_classes=n_classes)
+    tr_transforms, vl_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size, depth_last=depth_last, n_classes=n_classes, im_size=im_size)
     batch_size = 1
     test_batch_size = 1
     gpu = torch.cuda.is_available()
@@ -99,6 +99,14 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
     ovft_loader = md.DataLoader(ovft_ds, batch_size=test_batch_size, num_workers=0, pin_memory=gpu)
     return tr_loader, ovft_loader, vl_loader
 
+
+'''def get_data_from_mask(volume, mask):
+    labels = np.unique(mask)[1:]
+    sizes = [np.where(volume == l) for l in labels]
+    for l in labels:
+        np.where(volume == l)
+        volume[volume == l]
+    return data'''
 
 def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(48, 512, 512), instance_seg=False, is_numpy=False):
     if is_numpy:
