@@ -1,15 +1,17 @@
-"""Functions to calculate training loss on batches of images.
-
-While functions are comparable to the ones found in the module metrics,
-these rely on keras' backend and do not take raw numpy as input.
-"""
+"""Functions to calculate training loss on batches of images."""
 
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from monai.losses import DiceLoss
 import warnings
+from skimage.segmentation import find_boundaries
+from skimage.measure import label
 import pdb
+import numpy as np
+
+epsilon = 1e-5
+
 
 class CompoundLoss(nn.Module):
     def __init__(self, loss1, loss2=None, alpha1=1., alpha2=0.):
@@ -30,11 +32,13 @@ class CompoundLoss(nn.Module):
             return self.alpha1*l1
         return self.alpha1*l1 + self.alpha2 * l2
 
+
 class DSCLoss(nn.Module):
-    def __init__(self, include_background=False):
+    def __init__(self, shape_priors, include_background=False):
         super(DSCLoss, self).__init__()
         self.loss = DiceLoss(softmax=True, include_background=include_background)
         self.check_softmax = True
+        self.shape_priors = shape_priors
 
     def forward(self, y_pred, y_true):
         if self.check_softmax:
@@ -42,14 +46,44 @@ class DSCLoss(nn.Module):
                 # flatten(2) flattens all after dim=2, sum over classes, take mean to get per-batch values, & take mean
                 warnings.warn('check you did not apply softmax before loss computation')
             else: self.check_softmax = False
-        return self.loss(y_pred, y_true)
+        loss = self.loss(y_pred, y_true)
+        for s in self.shape_priors: loss += s(y_pred[:,2].squeeze(0))
+        return loss
+
+
+class CompactnessLoss(nn.Module):
+    def __init__(self):
+        super(CompactnessLoss, self).__init__()
+
+    def compactness(self, mask):
+        mask = (mask > 0.5).to(torch.uint8)
+        mask_np = label(mask.detach().cpu().numpy(), connectivity=3)
+        compactness = 0
+        for l in np.unique(mask_np):
+            if l == 0: continue
+            mask_l = (mask_np == l).astype(np.uint8)
+            for z in range(mask_np.shape[0]):
+                perimeter = find_boundaries(mask_l, connectivity=2, mode='inner')
+                compactness += (4 * np.pi * np.sum(mask_l[z])) / (np.sum(perimeter) ** 2 + epsilon)
+            compactness /= mask_l.shape[0]
+        return compactness
+
+    def forward(self, y_pred):
+        compactness_value = self.compactness(y_pred)
+        loss = 1 / (compactness_value + epsilon)
+        return loss
+
 
 class CELoss(nn.Module):
-    def __init__(self):
+    def __init__(self, shape_priors):
         super(CELoss, self).__init__()
         self.loss = torch.nn.CrossEntropyLoss()
+        self.shape_priors = shape_priors
+
     def forward(self, y_pred, y_true):
-        return self.loss(y_pred, y_true)
+        loss = self.loss(y_pred, y_true)
+        for s in self.shape_priors: loss += s(y_pred[:,2].squeeze(0))
+        return loss
 
 
 def soft_erode(img):
@@ -123,13 +157,16 @@ class clCELoss(torch.nn.Module):
         return cl_ce
 
 
-def get_loss(loss1, loss2=None, alpha1=1., alpha2=0.):
+def get_loss(loss1, loss2=None, shape_priors=[], alpha1=1., alpha2=0.):
     if loss1 == loss2 and alpha2 != 0.:
         warnings.warn('using same loss twice, you sure?')
     loss_dict = dict()
-    loss_dict['ce'] = CELoss()
-    loss_dict['dice'] = DSCLoss()
-    loss_dict['cedice'] = CompoundLoss(CELoss(), DSCLoss(), alpha1=1., alpha2=1.)
+    loss_dict['compactness'] = CompactnessLoss()
+    # ... more shape priors to add
+    shape_priors = [loss_dict[s] for s in shape_priors if s in shape_priors]
+    loss_dict['ce'] = CELoss(shape_priors)
+    loss_dict['dice'] = DSCLoss(shape_priors)
+    loss_dict['cedice'] = CompoundLoss(CELoss(shape_priors), DSCLoss(shape_priors), alpha1=1., alpha2=1.)
     loss_dict['cldice'] = clDiceLoss()
     loss_dict['clce'] = clCELoss()
 

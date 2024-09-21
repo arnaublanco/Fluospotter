@@ -77,10 +77,10 @@ def get_loaders_fullres(data_path, batch_size=1, im_size=(96, 96, 64), num_worke
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, ovft_check=0, depth_last=False, n_classes=2):
+def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, ovft_check=0, depth_last=False, n_classes=2, im_size=(48,512,512)):
 
     tr_files, vl_files = get_train_val_test_splits(data_path, labels_path)
-    tr_transforms, vl_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size, depth_last=depth_last, n_classes=n_classes)
+    tr_transforms, vl_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size, depth_last=depth_last, n_classes=n_classes, im_size=im_size)
     batch_size = 1
     test_batch_size = 1
     gpu = torch.cuda.is_available()
@@ -100,10 +100,25 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
     return tr_loader, ovft_loader, vl_loader
 
 
-def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(48, 512, 512), instance_seg=False):
-    test_files = get_test_split(data_path, labels_path)
+'''def get_data_from_mask(volume, mask):
+    labels = np.unique(mask)[1:]
+    sizes = [np.where(volume == l) for l in labels]
+    for l in labels:
+        np.where(volume == l)
+        volume[volume == l]
+    return data'''
+
+def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(48, 512, 512), instance_seg=False, is_numpy=False):
+    if is_numpy:
+        if len(data_path.shape) == 4:
+            test_files = { 'img': [] }
+            for n in range(data_path.shape[0]): test_files['img'].append(data_path[n])
+        else:
+            test_files = {'img': [data_path]}
+    else:
+        test_files = get_test_split(data_path, labels_path)
     _, test_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size,
-                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg)
+                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg, is_numpy=is_numpy)
     batch_size = 1
     gpu = torch.cuda.is_available()
     test_ds = md.Dataset(data=test_files, transform=test_transforms)
@@ -114,18 +129,18 @@ def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_s
 def join_connected_puncta(data, mask):
     out = np.zeros_like(mask, dtype=np.int8)
     labels = np.unique(mask)
-    for l in labels[1:]:  # Skip label 0 (background)
+    for l in labels[1:]:
         mask_label = mask == l
-        if not np.any(mask_label):  # Skip empty masks
+        if not np.any(mask_label):
             continue
-        # Find the index of the maximum value in the component
+
         max_idx = np.argmax(data[mask_label])
-        # Create a mask with the maximum value position set to True
+
         max_pos_mask = np.zeros_like(mask_label)
         max_pos_mask[np.nonzero(mask_label)[0][max_idx],
                      np.nonzero(mask_label)[1][max_idx],
                      np.nonzero(mask_label)[2][max_idx]] = True
-        out[max_pos_mask] = 1  # Set this position to 1 in the output mask
+        out[max_pos_mask] = 1
     return out
 
 

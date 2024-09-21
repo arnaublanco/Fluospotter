@@ -162,7 +162,7 @@ def train_model(
     print('* Creating Dataloaders, batch size = {}, samples/vol = {}, workers = {}'.format(cfg["batch_size"], cfg["n_samples"], cfg["num_workers"]))
 
     tr_loader, ovft_loader, vl_loader = get_loaders(data_path=dataset.data_dir, labels_path=labels_path, n_samples=int(cfg["n_samples"]), neg_samples=int(cfg["neg_samples"]),
-                                                    patch_size=tuple(map(int, cfg["patch_size"].split('/'))), num_workers=int(cfg["num_workers"]), ovft_check=int(cfg["ovft_check"]), depth_last=bool(cfg["depth_last"]),
+                                                    patch_size=tuple(map(int, cfg["patch_size"].split('/'))), im_size=tuple(map(int, cfg["im_size"].split('/'))), num_workers=int(cfg["num_workers"]), ovft_check=int(cfg["ovft_check"]), depth_last=bool(cfg["depth_last"]),
                                                     n_classes=n_classes)
 
     print("Total params: {0:,}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
@@ -183,7 +183,7 @@ def train_model(
         T = int(cfg["n_epochs"]) * len(tr_loader) * int(cfg["n_samples"]) // int(cfg["batch_size"])
 
     scheduler = get_scheduler(scheduler=scheduler_name, optimizer=optimizer, T=T, eta_min=0)
-    loss_fn = get_loss(cfg["loss1"], cfg["loss2"], float(cfg["alpha1"]), float(cfg["alpha2"]))
+    loss_fn = get_loss(cfg["loss1"], cfg["loss2"], cfg["shape_priors"], float(cfg["alpha1"]), float(cfg["alpha2"]))
 
     print('* Instantiating loss function {:.2f}*{} + {:.2f}*{}'.format(cfg["alpha1"], cfg["loss1"], cfg["alpha2"],
                                                                        cfg["loss2"]))
