@@ -6,7 +6,7 @@ from monai.inferers import sliding_window_inference
 from .metrics import compute_segmentation_metrics, compute_puncta_metrics
 from .data import match_labeling, join_connected_puncta
 from .metrics import fast_bin_auc, fast_bin_dice
-from skimage.measure import label
+from skimage.measure import label, regionprops
 from sklearn.neighbors import KNeighborsClassifier
 from skimage.morphology import binary_opening
 import time
@@ -166,6 +166,98 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False):
             del labels
             t.update()
     return out
+
+
+def instance_segmentation(labeled_3d_array, descriptors=("area", "perimeter", "compactness", "elongation", "eccentricity")):
+    """
+    Perform instance segmentation on a 3D labeled array with dynamic calculation of mean and std for each shape descriptor.
+
+    Parameters:
+    - labeled_3d_array: 3D numpy array where regions are labeled with unique integers.
+    - descriptors: Tuple of descriptors to be used for splitting. Default includes ("area", "perimeter", "compactness", "elongation", "eccentricity").
+
+    Returns:
+    - segmented_array: 3D numpy array with unique labels for each segmented object.
+    """
+    # Initialize an array to store the final segmentation results
+    segmented_array = np.zeros_like(labeled_3d_array)
+
+    # Dictionaries to store cumulative values for each descriptor
+    descriptor_sums = {desc: [] for desc in descriptors}
+
+    # Iterate through each slice of the 3D array
+    for z in range(labeled_3d_array.shape[0]):
+        # Current slice
+        current_slice = labeled_3d_array[z]
+
+        # Calculate connected component labels for the current slice
+        labeled_slice = label(current_slice)
+        slice_props = regionprops(labeled_slice)
+
+        # Calculate mean and std for each descriptor based on previous slices
+        mean_values = {}
+        std_values = {}
+        for desc in descriptors:
+            if descriptor_sums[desc]:
+                mean_values[desc] = np.mean(descriptor_sums[desc])
+                std_values[desc] = np.std(descriptor_sums[desc])
+            else:
+                mean_values[desc] = 0
+                std_values[desc] = 0
+
+        # List to keep track of regions to be split in this slice
+        regions_to_split = []
+
+        # Process each region in the current slice
+        for region in slice_props:
+            # Extract region properties
+            area = region.area
+            perimeter = region.perimeter
+            compactness = (perimeter ** 2) / area if area != 0 else 0
+            elongation = (region.major_axis_length / region.minor_axis_length) if region.minor_axis_length != 0 else 0
+            eccentricity = region.eccentricity
+
+            # Store all calculated descriptors
+            descriptor_values = {
+                "area": area,
+                "perimeter": perimeter,
+                "compactness": compactness,
+                "elongation": elongation,
+                "eccentricity": eccentricity
+            }
+
+            # Append current values to descriptor sums
+            for desc in descriptors:
+                descriptor_sums[desc].append(descriptor_values[desc])
+
+            # Check if any descriptor exceeds mean + 3*std threshold
+            for desc in descriptors:
+                if mean_values[desc] > 0 and std_values[desc] > 0:  # Avoid initial state with zeros
+                    value = descriptor_values[desc]
+                    mean = mean_values[desc]
+                    std = std_values[desc]
+                    if value > mean + 3 * std:
+                        regions_to_split.append(region.label)
+                        break
+
+        # Split regions if necessary
+        for label_id in regions_to_split:
+            # Remove the merged region from the segmented array
+            labeled_slice[labeled_slice == label_id] = 0
+
+            # Create a mask for the specific region to be split
+            region_mask = (labeled_slice == 0) & (current_slice == label_id)
+
+            # Re-label the region in 2D to create individual segments
+            new_labels = label(region_mask)
+
+            # Add the new labels back to the current slice
+            labeled_slice += new_labels
+
+        # Store the processed slice back to the segmented array
+        segmented_array[z] = labeled_slice
+
+    return segmented_array
 
 
 def train_knn(borders: np.array, preds: np.array) -> np.array:
