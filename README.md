@@ -24,6 +24,20 @@ In fluorescent microscopy data, detecting diffraction-limited puncta is a common
 
 Fluospotter addresses these challenges by automatically finding puncta without the need for human intervention. It achieves precise and efficient puncta detection in fluorescent microscopy images by leveraging a neural network. Moreover, it utilizes a trained U-Net optimized for fast segmentation of cell nuclei.
 
+### Segmentation model
+
+Fluospotter uses an [nnU-Net architecture](https://www.nature.com/articles/s41592-020-01008-z), a semantic segmentation method that automatically adapts a U-Net to a given dataset. Traditionally, when faced with a new problem, a tailored solution needs to be manually designed and optimized based on the volume sizes, the voxel sizes, the class ratio, among other factors. However, this is not the case with nnU-Net, as it analyzes the provided training cases and automatically configures a matching U-Net-based segmentation pipeline. The model has been trained on data containing three distinct classes:
+
+* Class 0 (*background*): Represents areas outside the nuclei.
+* Class 1 (*border*): Captures the boundaries of the nuclei, helping to separate touching cells.
+* Class 2 (*interior*): Represents the inside region of the cell nuclei.
+
+This multi-class segmentation approach allows Fluospotter to accurately delineate the spatial structure of cell nuclei, even in challenging scenarios where cells are closely packed or overlapping. It also enables segmentation with an unknown number of cells, which can later be utilized for instance segmentation. For instance segmentation, connected component labels are assigned to the regions classified as class 2 (interior) to identify and distinguish individual cells.
+
+Since nuclei can expand across multiple z-slices, it is possible that one nucleus in a particular slice could be mistakenly merged with a different nucleus in the adjacent slice. To address this, after assigning unique labels, each z-slice is iterated through for every label and compared with all the previous ones based on several shape descriptors: area, perimeter, compactness, elongation, and eccentricity. If any label's values exceed the `mean + 3*standard deviation` (using the [three-sigma rule](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule)), it is flagged as a wrong merge, indicating that two or more nuclei have been incorrectly combined.
+
+Segmentation is performed using a moving window approach to handle the data in smaller chunks, as processing the entire volume at once would be computationally expensive in terms of memory.
+
 ## Installation
 
 This package is built for Python versions newer than 3.6 and can easily be installed with pip:
