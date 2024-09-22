@@ -26,7 +26,7 @@ Fluospotter addresses these challenges by automatically finding puncta without t
 
 ### Segmentation model
 
-Fluospotter uses an [nnU-Net architecture](https://www.nature.com/articles/s41592-020-01008-z), a semantic segmentation method that automatically adapts a U-Net to a given dataset. Traditionally, when faced with a new problem, a tailored solution needs to be manually designed and optimized based on the volume sizes, the voxel sizes, the class ratio, among other factors. However, this is not the case with nnU-Net, as it analyzes the provided training cases and automatically configures a matching U-Net-based segmentation pipeline. The model has been trained on data containing three distinct classes:
+Fluospotter uses an [nnU-Net architecture](https://www.nature.com/articles/s41592-020-01008-z), a semantic segmentation method that automatically adapts a U-Net to a given dataset. Traditionally, when faced with a new problem, a tailored solution needs to be manually designed and optimized based on several factors such as volume sizes, class ratio, voxel sizes, among others. However, this is not the case with nnU-Net, as it analyzes the provided training cases and automatically configures a matching U-Net-based segmentation pipeline. The model has been trained on data containing three distinct classes:
 
 * Class 0 (*background*): Represents areas outside the nuclei.
 * Class 1 (*border*): Captures the boundaries of the nuclei, helping to separate touching cells.
