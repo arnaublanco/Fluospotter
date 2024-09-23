@@ -47,9 +47,9 @@ def validate(model, loader, loss_fn, slwin_bs=2):
     return [100 * np.mean(np.array(dscs)), 100 * np.mean(np.array(aucs)), np.mean(np.array(losses))]
 
 
-def evaluate(model, loader, slwin_bs=2, compute_metrics=False):
+def evaluate(model, loader, slwin_bs=2, compute_metrics=False, combined_reg=False):
     if model.cfg["model_type"] == "segmentation":
-        out = evaluate_seg(model, loader, compute_metrics=compute_metrics)
+        out = evaluate_seg(model, loader, compute_metrics=compute_metrics, combined_seg=combined_reg)
     elif model.cfg["model_type"] == "puncta_detection":
         out = evaluate_puncta(model, loader, compute_metrics=compute_metrics)
     return out
@@ -129,7 +129,23 @@ def evaluate_puncta(model, loader, slwin_bs=2, compute_metrics=False):
     return out
 
 
-def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False):
+def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, combined_seg=False, patch_size=(48, 256, 256),
+                 overlap=0.1):
+    """
+    Evaluate the segmentation model and optionally combine chunked predictions into a single volume.
+
+    Parameters:
+    - model: PyTorch model for segmentation.
+    - loader: DataLoader for test data.
+    - slwin_bs: Batch size for sliding window inference.
+    - compute_metrics: Boolean, whether to compute metrics or not.
+    - combined_seg: Boolean, whether to combine chunked predictions into a single volume.
+    - patch_size: Tuple, size of the patch for sliding window inference.
+    - overlap: Float, overlap for sliding window inference.
+
+    Returns:
+    - out: Dictionary containing combined segmentation results and optional metrics.
+    """
     model_refine = model.refinement if model.refinement else None
     cfg = model.cfg
     model = model.network
@@ -137,34 +153,70 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False):
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
     patch_size = tuple(map(int, cfg["patch_size"].split('/')))
     out = {}
+
+    # If combined_seg is True, prepare to store the combined prediction volume
+    if combined_seg:
+        # Determine the volume shape from the loader
+        volume_shape = loader.dataset[0]['img'].shape[1:]  # (Z, Y, X)
+        combined_pred = np.zeros(volume_shape, dtype=np.int8)  # Create an empty volume for combined predictions
+        weight_map = np.zeros(volume_shape, dtype=np.float32)  # Weight map for combining overlapping regions
+
+        # Get the total number of chunks based on the volume size and patch size
+        z_steps = (volume_shape[0] - patch_size[0]) // int(patch_size[0] * (1 - overlap)) + 1
+        y_steps = (volume_shape[1] - patch_size[1]) // int(patch_size[1] * (1 - overlap)) + 1
+        x_steps = (volume_shape[2] - patch_size[2]) // int(patch_size[2] * (1 - overlap)) + 1
+
     with trange(len(loader)) as t:
-        for val_data in loader:
+        for chunk_idx, val_data in enumerate(loader):
             images = val_data["img"].to(device)
             labels = val_data["seg"] if 'seg' in val_data else None
-            preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=0.1, mode='gaussian').cpu()
+
+            # Perform sliding window inference
+            preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=overlap,
+                                             mode='gaussian').cpu()
             preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
+
+            if combined_seg:
+                # Calculate the chunk position manually based on chunk_idx
+                z_idx = (chunk_idx // (y_steps * x_steps)) % z_steps
+                y_idx = (chunk_idx // x_steps) % y_steps
+                x_idx = chunk_idx % x_steps
+
+                # Compute the start and end indices for each dimension
+                z_start, y_start, x_start = z_idx * int(patch_size[0] * (1 - overlap)), y_idx * int(
+                    patch_size[1] * (1 - overlap)), x_idx * int(patch_size[2] * (1 - overlap))
+                z_end, y_end, x_end = z_start + patch_size[0], y_start + patch_size[1], x_start + patch_size[2]
+
+                # Add the predictions to the combined volume with weights for overlapping regions
+                combined_pred[z_start:z_end, y_start:y_end, x_start:x_end] += preds
+                weight_map[z_start:z_end, y_start:y_end, x_start:x_end] += 1
+
             if labels is not None:
                 labels = labels.squeeze().numpy().astype(np.int8)
-                if labels.shape[0] != preds.shape[0]: labels = labels.argmax(0)
+                if labels.shape[0] != preds.shape[0]:
+                    labels = labels.argmax(0)
+
             if bool(cfg["instance_seg"]):
                 preds = (preds == 2).astype(int)
                 preds = binary_opening(preds)
                 preds = label(preds, connectivity=3)
-                if bool(cfg["refinement"]):
-                    binary_mask = sliding_window_inference(images, patch_size, slwin_bs, model_refine, overlap=0.1, mode='gaussian').cpu()
-                    binary_mask = binary_mask.argmax(dim=1).squeeze().numpy().astype(np.int8)
-                    preds = train_knn(binary_mask, preds)
-                    del binary_mask
+
             if compute_metrics and labels is not None:
                 preds = match_labeling(labels, preds)
                 out = compute_segmentation_metrics(preds, labels, out)
             else:
                 if len(out) == 0: out['seg'] = []
                 out['seg'].append(preds)
+
             del images
             del preds
             del labels
             t.update()
+
+    if combined_seg:
+        combined_pred = (combined_pred / np.maximum(weight_map, 1)).astype(np.int8)
+        out['seg'] = combined_pred
+
     return out
 
 

@@ -38,14 +38,16 @@ class SegmentationModel(Model):
         train_model(dataset=dataset, model=self, refinement=refinement)
 
     def predict(self, dataset: Dataset) -> None:
+        im_size = tuple(map(int, self.cfg["im_size"].split('/')))
         test_loaders = get_loaders_test(data_path=dataset.data_dir, labels_path='',
                                         n_samples=int(self.cfg["n_samples"]), neg_samples=int(self.cfg["neg_samples"]),
                                         patch_size=tuple(map(int, self.cfg["patch_size"].split('/'))),
-                                        im_size=tuple(map(int, self.cfg["im_size"].split('/'))),
+                                        im_size=im_size,
                                         num_workers=int(self.cfg["num_workers"]),
                                         instance_seg=bool(self.cfg["instance_seg"]),
                                         depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]))
-        predictions = evaluate(self, test_loaders, compute_metrics=False)
+        combined_reg = (im_size[1] > 256) | (im_size[2] > 256)
+        predictions = evaluate(self, test_loaders, compute_metrics=False, combined_reg=combined_reg)
         return predictions
 
     def predict_image(self, dataset: np.array) -> None:
