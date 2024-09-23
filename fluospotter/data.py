@@ -108,6 +108,7 @@ def get_loaders(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(
         volume[volume == l]
     return data'''
 
+
 def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_size=(48, 256, 256), num_workers=0, depth_last=False, n_classes=2, im_size=(48, 512, 512), instance_seg=False, is_numpy=False):
     if is_numpy:
         if len(data_path.shape) == 4:
@@ -118,7 +119,7 @@ def get_loaders_test(data_path, labels_path, n_samples=1, neg_samples=1, patch_s
     else:
         test_files = get_test_split(data_path, labels_path)
     _, test_transforms = get_transforms_patches(n_samples, neg_samples, patch_size=patch_size,
-                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg, is_numpy=is_numpy)
+                                                          depth_last=depth_last, n_classes=n_classes, im_size=im_size, instance_seg=instance_seg, is_numpy=is_numpy, chunk_size=(im_size.shape[0], 256, 256))
     batch_size = 1
     gpu = torch.cuda.is_available()
     test_ds = md.Dataset(data=test_files, transform=test_transforms)
