@@ -11,7 +11,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from skimage.morphology import binary_opening
 import time
 import torch
-
+import torch.nn.functional as F
 
 def validate(model, loader, loss_fn, slwin_bs=2):
     model.eval()
@@ -166,14 +166,13 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, combined_seg=
     if combined_seg:
         # Determine the volume shape from the loader
         factor, volume_shape = np.sqrt(loader.dataset[0]['img'].shape[0]), loader.dataset[0]['img'].shape[1:]  # (Z, Y, X)
-        combined_pred = np.zeros((volume_shape[0], (int(factor)-1) * volume_shape[1], (int(factor)-1) * volume_shape[2]), dtype=np.float16)  # Create an empty volume for combined predictions
-        weight_map = np.zeros((volume_shape[0], (int(factor)-1) * volume_shape[1], (int(factor)-1) * volume_shape[2]), dtype=np.float32)  # Weight map for combining overlapping regions
+        combined_pred = np.zeros((volume_shape[0], (int(factor)-1) * volume_shape[1], (int(factor)-1) * volume_shape[2]), dtype=np.int8)  # Create an empty volume for combined predictions
+        weight_map = np.zeros((volume_shape[0], (int(factor)-1) * volume_shape[1], (int(factor)-1) * volume_shape[2]), dtype=np.int8)  # Weight map for combining overlapping regions
 
         # Get the total number of chunks based on the volume size and patch size
         y_steps = (volume_shape[1] * (factor-1) - volume_shape[1]) // int(volume_shape[1] * (1 - overlap)) + 1
         x_steps = (volume_shape[2] * (factor-1) - volume_shape[2]) // int(volume_shape[2] * (1 - overlap)) + 1
-
-        gaussian_weights = gaussian_window(volume_shape[1], sigma=volume_shape[1] // 3)
+        pad_x, pad_y = 10, 10
 
     for _, val_data in enumerate(loader):
         images = val_data["img"].to(device)
@@ -182,7 +181,8 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, combined_seg=
         with trange(images.shape[1]) as t:
             # Perform sliding window inference
             for n in range(images.shape[1]):
-                preds = sliding_window_inference(images[:,n].unsqueeze(0), patch_size, slwin_bs, model, overlap=overlap,
+                volume = F.pad(images[:,n,:,pad_y:-pad_y,pad_y:-pad_x], pad=(pad_y, pad_y, pad_y, pad_y, 0, 0), mode='reflect').unsqueeze(0)
+                preds = sliding_window_inference(volume, patch_size, slwin_bs, model, overlap=overlap,
                                                  mode='gaussian').cpu()
                 preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
 
@@ -196,9 +196,8 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, combined_seg=
                 y_end, x_end = min(int(y_start + volume_shape[1]),(int(factor)-1) * volume_shape[1]), min(int(x_start + volume_shape[2]), (int(factor)-1) * volume_shape[2])
 
                 # Add the predictions to the combined volume with weights for overlapping regions
-                pdb.set_trace()
-                combined_pred[:, y_start:y_end, x_start:x_end] += preds[:,:(y_end-y_start),:(x_end-x_start)] * gaussian_weights[:(y_end-y_start),:(x_end-x_start)]
-                weight_map[:, y_start:y_end, x_start:x_end] += gaussian_weights[:(y_end-y_start),:(x_end-x_start)]
+                combined_pred[:, y_start:y_end, x_start:x_end] += preds[:,:(y_end-y_start),:(x_end-x_start)]
+                weight_map[:, y_start:y_end, x_start:x_end] += 1
                 chunk_idx += 1
                 t.update()
             del images
