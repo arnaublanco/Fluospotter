@@ -16,7 +16,7 @@ from ..data import get_loaders_test
 class SegmentationModel(Model):
     """Class to segment nuclei; see base class."""
 
-    def __init__(self, pretrained=None, refinement=None, model_name='small_unet_3d',
+    def __init__(self, pretrained=None, refinement=None, model_name='dynunet',
                  configuration={}, **kwargs):
         super().__init__(**kwargs)
         self.cfg = check_seg_configuration_file(configuration)
