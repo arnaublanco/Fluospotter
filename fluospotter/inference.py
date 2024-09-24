@@ -164,13 +164,14 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, overlap=0.2):
         factor, volume_shape = np.sqrt(loader.dataset[0]['img'].shape[0]), loader.dataset[0]['img'].shape[
                                                                            1:]
         combined_pred = np.zeros((volume_shape[0], im_size[1], im_size[2]),
-                                 dtype=np.int8)
+                                 dtype=np.float32)
         weight_map = np.zeros((volume_shape[0], im_size[1], im_size[2]),
-                              dtype=np.int8)
+                              dtype=np.float32)
 
         y_steps = np.ceil((im_size[1] - volume_shape[1]) / (volume_shape[1] * (1 - overlap))).astype(int) + 1
         x_steps = np.ceil((im_size[2] - volume_shape[2]) / (volume_shape[2] * (1 - overlap))).astype(int) + 1
-        pad_y, pad_x = int(volume_shape[1] * 0.1 / 2), int(volume_shape[2] * 0.1 / 2)
+        pad_y, pad_x = int(volume_shape[1] * 0.05 / 2), int(volume_shape[2] * 0.05 / 2)
+        gaussian_weights = gaussian_window(volume_shape[1], sigma=volume_shape[1] // 6)
 
         for _, val_data in enumerate(loader):
             images = val_data["img"].to(device)
@@ -179,7 +180,8 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, overlap=0.2):
 
             with trange(images.shape[1]) as t:
                 for n in range(images.shape[1]):
-                    volume = F.pad(images[:, n], pad=(pad_x, pad_x, pad_y, pad_y, 0, 0), mode='edge').unsqueeze(0)
+                    volume = F.pad(images[:, n], pad=(pad_x, pad_x, pad_y, pad_y, 0, 0), mode='reflect').unsqueeze(0)
+                    #volume = images[:,n].unsqueeze(0)
                     preds = sliding_window_inference(volume, patch_size, slwin_bs, model, overlap=overlap,
                                                      mode='gaussian').cpu()
                     preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
@@ -191,8 +193,8 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, overlap=0.2):
                     y_end = min(y_start + volume_shape[1], im_size[1])
                     x_end = min(x_start + volume_shape[2], im_size[2])
 
-                    combined_pred[:, y_start:y_end, x_start:x_end] += preds[:, :(y_end - y_start), :(x_end - x_start)]
-                    weight_map[:, y_start:y_end, x_start:x_end] += 1
+                    combined_pred[:, y_start:y_end, x_start:x_end] += preds[:, :(y_end - y_start), :(x_end - x_start)] * gaussian_weights[:(y_end - y_start), :(x_end - x_start)]
+                    weight_map[:, y_start:y_end, x_start:x_end] += gaussian_weights[:(y_end - y_start), :(x_end - x_start)]
                     t.update()
                     del preds
                 del images
