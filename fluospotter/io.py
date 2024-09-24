@@ -49,9 +49,9 @@ def check_seg_configuration_file(cfg: Dict) -> Dict:
         "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "refinement", "full_resolution", "instance_seg"
     ]
     values = [
-        2, "small_unet_3d", False, "ce", "dice", [],
+        3, "dynunet", False, "ce", "dice", [],
         1.0, 1.0, 1, 4, 12, 1,
-        4, "48/256/256", "adam", 3e-4, 20, 5,
+        4, "40/128/128", "adam", 3e-4, 20, 5,
         True, "DSC", 0, False, 1, False, False, False]
 
     for p in range(len(params)):

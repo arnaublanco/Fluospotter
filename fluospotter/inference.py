@@ -129,8 +129,16 @@ def evaluate_puncta(model, loader, slwin_bs=2, compute_metrics=False):
     return out
 
 
+def gaussian_window(size, sigma=1):
+    """Create a 2D Gaussian window."""
+    ax = np.arange(-size // 2 + 1, size // 2 + 1)
+    xx, yy = np.meshgrid(ax, ax)
+    kernel = np.exp(-0.5 * (np.square(xx) + np.square(yy)) / np.square(sigma))
+    return kernel / np.sum(kernel)
+
+
 def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, combined_seg=False, patch_size=(48, 256, 256),
-                 overlap=0.1):
+                 overlap=0.2):
     """
     Evaluate the segmentation model and optionally combine chunked predictions into a single volume.
 
@@ -157,40 +165,43 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, combined_seg=
     # If combined_seg is True, prepare to store the combined prediction volume
     if combined_seg:
         # Determine the volume shape from the loader
-        volume_shape = loader.dataset[0]['img'].shape[1:]  # (Z, Y, X)
-        combined_pred = np.zeros(volume_shape, dtype=np.int8)  # Create an empty volume for combined predictions
-        weight_map = np.zeros(volume_shape, dtype=np.float32)  # Weight map for combining overlapping regions
+        factor, volume_shape = np.sqrt(loader.dataset[0]['img'].shape[0]), loader.dataset[0]['img'].shape[1:]  # (Z, Y, X)
+        combined_pred = np.zeros((volume_shape[0], (int(factor)-1) * volume_shape[1], (int(factor)-1) * volume_shape[2]), dtype=np.float16)  # Create an empty volume for combined predictions
+        weight_map = np.zeros((volume_shape[0], (int(factor)-1) * volume_shape[1], (int(factor)-1) * volume_shape[2]), dtype=np.float32)  # Weight map for combining overlapping regions
 
         # Get the total number of chunks based on the volume size and patch size
-        z_steps = (volume_shape[0] - patch_size[0]) // int(patch_size[0] * (1 - overlap)) + 1
-        y_steps = (volume_shape[1] - patch_size[1]) // int(patch_size[1] * (1 - overlap)) + 1
-        x_steps = (volume_shape[2] - patch_size[2]) // int(patch_size[2] * (1 - overlap)) + 1
+        y_steps = (volume_shape[1] * (factor-1) - volume_shape[1]) // int(volume_shape[1] * (1 - overlap)) + 1
+        x_steps = (volume_shape[2] * (factor-1) - volume_shape[2]) // int(volume_shape[2] * (1 - overlap)) + 1
 
-    with trange(len(loader)) as t:
-        for chunk_idx, val_data in enumerate(loader):
-            images = val_data["img"].to(device)
-            labels = val_data["seg"] if 'seg' in val_data else None
+        gaussian_weights = gaussian_window(volume_shape[1], sigma=volume_shape[1] // 3)
 
+    for _, val_data in enumerate(loader):
+        images = val_data["img"].to(device)
+        labels = val_data["seg"] if 'seg' in val_data else None
+        chunk_idx = 0
+        with trange(images.shape[1]) as t:
             # Perform sliding window inference
-            preds = sliding_window_inference(images, patch_size, slwin_bs, model, overlap=overlap,
-                                             mode='gaussian').cpu()
-            preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
+            for n in range(images.shape[1]):
+                preds = sliding_window_inference(images[:,n].unsqueeze(0), patch_size, slwin_bs, model, overlap=overlap,
+                                                 mode='gaussian').cpu()
+                preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
 
-            if combined_seg:
                 # Calculate the chunk position manually based on chunk_idx
-                z_idx = (chunk_idx // (y_steps * x_steps)) % z_steps
                 y_idx = (chunk_idx // x_steps) % y_steps
                 x_idx = chunk_idx % x_steps
 
                 # Compute the start and end indices for each dimension
-                z_start, y_start, x_start = z_idx * int(patch_size[0] * (1 - overlap)), y_idx * int(
-                    patch_size[1] * (1 - overlap)), x_idx * int(patch_size[2] * (1 - overlap))
-                z_end, y_end, x_end = z_start + patch_size[0], y_start + patch_size[1], x_start + patch_size[2]
+                y_start, x_start = int(y_idx * int(
+                    volume_shape[1] * (1 - overlap))), int(x_idx * int(volume_shape[2] * (1 - overlap)))
+                y_end, x_end = min(int(y_start + volume_shape[1]),(int(factor)-1) * volume_shape[1]), min(int(x_start + volume_shape[2]), (int(factor)-1) * volume_shape[2])
 
                 # Add the predictions to the combined volume with weights for overlapping regions
-                combined_pred[z_start:z_end, y_start:y_end, x_start:x_end] += preds
-                weight_map[z_start:z_end, y_start:y_end, x_start:x_end] += 1
-
+                pdb.set_trace()
+                combined_pred[:, y_start:y_end, x_start:x_end] += preds[:,:(y_end-y_start),:(x_end-x_start)] * gaussian_weights[:(y_end-y_start),:(x_end-x_start)]
+                weight_map[:, y_start:y_end, x_start:x_end] += gaussian_weights[:(y_end-y_start),:(x_end-x_start)]
+                chunk_idx += 1
+                t.update()
+            del images
             if labels is not None:
                 labels = labels.squeeze().numpy().astype(np.int8)
                 if labels.shape[0] != preds.shape[0]:
@@ -201,22 +212,18 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, combined_seg=
                 preds = binary_opening(preds)
                 preds = label(preds, connectivity=3)
 
-            if compute_metrics and labels is not None:
+            if combined_seg:
+                if len(out) == 0: out['seg'] = []
+                combined_pred = np.round(combined_pred / np.maximum(weight_map, 1e-6)).astype(np.int8)
+                out['seg'].append(combined_pred)
+            elif compute_metrics and labels is not None:
                 preds = match_labeling(labels, preds)
                 out = compute_segmentation_metrics(preds, labels, out)
             else:
                 if len(out) == 0: out['seg'] = []
                 out['seg'].append(preds)
-
-            del images
             del preds
             del labels
-            t.update()
-
-    if combined_seg:
-        combined_pred = (combined_pred / np.maximum(weight_map, 1)).astype(np.int8)
-        out['seg'] = combined_pred
-
     return out
 
 
