@@ -61,7 +61,6 @@ def custom_transform(d, chunk_size=(105, 256, 256), overlap=0.2, im_size=(105, 1
     img_shape = img_resized.shape  # Get the shape of the resized image
 
     # Calculate step size (accounting for overlap)
-    step_z = chunk_size[0]
     step_y = chunk_size[1] - int(overlap * chunk_size[1])
     step_x = chunk_size[2] - int(overlap * chunk_size[2])
 

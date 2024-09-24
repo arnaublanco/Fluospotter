@@ -168,9 +168,9 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, overlap=0.2):
         weight_map = np.zeros((volume_shape[0], im_size[1], im_size[2]),
                               dtype=np.int8)
 
-        y_steps = (im_size[1] - volume_shape[1]) // int(volume_shape[1] * (1 - overlap)) + 1
-        x_steps = (im_size[1] - volume_shape[2]) // int(volume_shape[2] * (1 - overlap)) + 1
-        pad_y, pad_x = (volume_shape[1] * 0.1) // 2, (volume_shape[2] * 0.1) // 2
+        y_steps = np.ceil((im_size[1] - volume_shape[1]) / (volume_shape[1] * (1 - overlap))).astype(int) + 1
+        x_steps = np.ceil((im_size[2] - volume_shape[2]) / (volume_shape[2] * (1 - overlap))).astype(int) + 1
+        pad_y, pad_x = int(volume_shape[1] * 0.1 / 2), int(volume_shape[2] * 0.1 / 2)
 
         for _, val_data in enumerate(loader):
             images = val_data["img"].to(device)
@@ -179,7 +179,7 @@ def evaluate_seg(model, loader, slwin_bs=2, compute_metrics=False, overlap=0.2):
 
             with trange(images.shape[1]) as t:
                 for n in range(images.shape[1]):
-                    volume = F.pad(images[:, n], pad=(pad_x, pad_x, pad_y, pad_y, 0, 0), mode='reflect').unsqueeze(0)
+                    volume = F.pad(images[:, n], pad=(pad_x, pad_x, pad_y, pad_y, 0, 0), mode='edge').unsqueeze(0)
                     preds = sliding_window_inference(volume, patch_size, slwin_bs, model, overlap=overlap,
                                                      mode='gaussian').cpu()
                     preds = preds.argmax(dim=1).squeeze().numpy().astype(np.int8)
