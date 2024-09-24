@@ -46,8 +46,7 @@ class SegmentationModel(Model):
                                         num_workers=int(self.cfg["num_workers"]),
                                         instance_seg=bool(self.cfg["instance_seg"]),
                                         depth_last=bool(self.cfg["depth_last"]), n_classes=int(self.cfg["n_classes"]))
-        combined_reg = (im_size[1] > 256) | (im_size[2] > 256)
-        predictions = evaluate(self, test_loaders, compute_metrics=False, combined_reg=combined_reg)
+        predictions = evaluate(self, test_loaders, compute_metrics=False)
         return predictions
 
     def predict_image(self, dataset: np.array) -> None:

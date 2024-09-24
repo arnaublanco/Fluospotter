@@ -46,13 +46,13 @@ def check_seg_configuration_file(cfg: Dict) -> Dict:
         "n_classes", "model_name", "pretrained", "loss1", "loss2", "shape_priors",
         "alpha1", "alpha2", "batch_size", "acc_grad", "n_samples", "neg_samples",
         "ovft_check", "patch_size", "optimizer", "lr", "n_epochs", "vl_interval",
-        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "refinement", "full_resolution", "instance_seg"
+        "cyclical_lr", "metric", "num_workers", "depth_last", "in_channels", "instance_seg"
     ]
     values = [
         3, "dynunet", False, "ce", "dice", [],
         1.0, 1.0, 1, 4, 12, 1,
         4, "40/128/128", "adam", 3e-4, 20, 5,
-        True, "DSC", 0, False, 1, False, False, False]
+        True, "DSC", 0, False, 1, False]
 
     for p in range(len(params)):
         if not (params[p] in cfg):
