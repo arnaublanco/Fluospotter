@@ -127,10 +127,6 @@ def load_folder(fname: str) -> List[str]:
     for f in files:
         try:
             file = imread(f)
-            if size is None:
-                size = file.shape
-            elif size != file.shape:
-                raise ValueError(f"Files do not coincide in shape. {f} has size {file.shape}, expected {size}")
         except Exception as e:
             raise ValueError(f"Could not load {os.path.join(fname, f)}.") from e
     return files
