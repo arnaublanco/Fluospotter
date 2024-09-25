@@ -34,8 +34,6 @@ Fluospotter uses an [nnU-Net architecture](https://www.nature.com/articles/s4159
 
 This multi-class segmentation approach allows Fluospotter to accurately delineate the spatial structure of cell nuclei, even in challenging scenarios where cells are closely packed or overlapping. It also enables segmentation with an unknown number of cells, which can later be utilized for instance segmentation. For instance segmentation, connected component labels are assigned to the regions classified as class 2 (interior) to identify and distinguish individual cells.
 
-Since nuclei can expand across multiple z-slices, it is possible that one nucleus in a particular slice could be mistakenly merged with a different nucleus in the adjacent slice. To address this, after assigning unique labels, each z-slice is iterated through for every label and compared with all the previous ones based on several shape descriptors: area, perimeter, compactness, elongation, and eccentricity. If any label's values exceed the `mean + 3*standard deviation` (using the [three-sigma rule](https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule)), it is flagged as a wrong merge, indicating that two or more nuclei have been incorrectly combined, and corrected as a result.
-
 Segmentation is performed using a moving window approach to handle the data in smaller chunks, as processing the entire volume at once would be computationally expensive in terms of memory.
 
 ## Installation
