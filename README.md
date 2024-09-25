@@ -1,6 +1,6 @@
 # Fluospotter
 
-<img src="logo.png" width="200px" align="right" alt="Logo of Fluospotter">
+<img src="images/logo.png" width="200px" align="right" alt="Logo of Fluospotter">
 
 Fluospotter is an end-to-end pipeline designed for nuclei segmentation and puncta detection in fluorescence microscopy images. In short, it offers:
 
@@ -86,7 +86,7 @@ docker-compose -f docker-compose.yml up --build
 
 Once the setup is complete, access WebKnossos in your web browser at `http://localhost:8080` to load and annotate your files.
 
-![Annotation with WebKnossos](annotation_webknossos.gif)
+![Annotation with WebKnossos](images/annotation_webknossos.gif)
 
 The [repository](https://github.com/scalableminds/webknossos) contains a detailed `README.md` and additional documentation for more specific configurations and troubleshooting.
 

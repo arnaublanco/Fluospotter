@@ -13,6 +13,7 @@ import time
 import torch
 import torch.nn.functional as F
 
+
 def validate(model, loader, loss_fn, slwin_bs=2):
     model.eval()
     device = 'cuda' if next(model.parameters()).is_cuda else 'cpu'
