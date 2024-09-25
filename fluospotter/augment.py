@@ -11,13 +11,13 @@ def permute_depth(x):
     return torch.permute(x, [0, 2, 3, 1])
 
 
-'''def custom_transform(d):
+def custom_transform_no_chunks(d):
     img = torch.as_tensor(imread(d['img']).astype(np.float32)).unsqueeze(0)
     if 'seg' in d and d['seg']:
         seg = torch.as_tensor(imread(d['seg']).astype(np.int8)).unsqueeze(0)
         return {'img': img, 'seg': seg}
     else:
-        return {'img': img}'''
+        return {'img': img}
 
 
 def custom_transform(d, chunk_size=(105, 256, 256), overlap=0.2, im_size=(105, 1024, 1024)):
@@ -50,7 +50,7 @@ def custom_transform(d, chunk_size=(105, 256, 256), overlap=0.2, im_size=(105, 1
     img_tensor = torch.as_tensor(img_volume.astype(np.float32)).unsqueeze(0).unsqueeze(0)
 
     # Resize the volume to the target size (im_size)
-    img_resized = F.interpolate(img_tensor, size=im_size, mode='trilinear', align_corners=False)
+    img_resized = F.interpolate(img_tensor, size=(img_volume.shape[0],im_size[1],im_size[2]), mode='trilinear', align_corners=False)
     img_resized = img_resized.squeeze(0).squeeze(0)  # Remove batch and channel dimensions
 
     # Scale intensity based on the entire resized volume
@@ -165,7 +165,7 @@ def get_transforms_patches(n_samples, neg_samples, patch_size, im_size, n_classe
 
     # Define training transforms
     tr_transforms = [
-        lambda_transform,
+        t.Lambda(lambda d: custom_transform_no_chunks(d)),
         t.RandCropByPosNegLabeld(keys=('img', 'seg'), label_key='seg', spatial_size=patch_size,
                                  num_samples=n_samples, pos=1, neg=neg_samples),
         t.RandScaleIntensityd(keys=('img',), factors=0.05, prob=p_app),
