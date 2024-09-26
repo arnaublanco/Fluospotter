@@ -99,16 +99,22 @@ prediction = model.predict(data)
 
 To annotate the data, [WebKnossos](https://webknossos.org) was employed. It uses AI to automatically detect cells within a bounding box specified by you across each slice, simplifying the annotation process. If the automatic detection is not accurate, the annotations can be easily corrected. While there is an online platform for uploading your data, you can also run WebKnossos locally if you prefer not to share your data.
 
-To use WebKnossos locally, first clone the repository:
+To use WebKnossos locally, first download `docker-compose.yml` using the PowerShell on Windows:
 
 ```
-git clone https://github.com/scalableminds/webknossos.git
-cd webknossos
+Invoke-WebRequest -Uri "https://github.com/scalableminds/webknossos/raw/master/tools/hosting/docker-compose.yml" -OutFile "docker-compose.yml"
 ```
+
+On Linux:
+
+```
+curl -o docker-compose.yml https://github.com/scalableminds/webknossos/raw/master/tools/hosting/docker-compose.yml
+```
+
 Next, use [Docker](https://www.docker.com/) to create a local environment and build and run WebKnossos:
 
 ```
-docker-compose -f docker-compose.yml up --build
+docker-compose up -d
 ```
 
 Once the setup is complete, access WebKnossos in your web browser at `http://localhost:8080` to load and annotate your files.
