@@ -39,7 +39,7 @@ This multi-class segmentation approach allows Fluospotter to accurately delineat
     <td style="padding-right: 20px; border: none; text-align: center;">
       <img src="images/annotations.png" width="175px" alt="Annotation example">
       <br>
-      <p style="margin: 5px 0;">Annotation Example 1</p>
+      <p style="margin: 5px 0;">Annotation example 1</p>
     </td>
     <td style="padding-right: 20px; border: none; text-align: center;">
       <img src="images/cells.png" width="175px" alt="Data example">
