@@ -111,13 +111,13 @@ On Linux:
 curl -o docker-compose.yml https://github.com/scalableminds/webknossos/raw/master/tools/hosting/docker-compose.yml
 ```
 
-Next, use [Docker](https://www.docker.com/) to create a local environment and build and run WebKnossos:
+Next, run [Docker](https://www.docker.com/) and open the command line with administrator privileges and run WebKnossos:
 
 ```
 docker-compose up -d
 ```
 
-Once the setup is complete, access WebKnossos in your web browser at `http://localhost:8080` to load and annotate your files.
+Now you should be able to access WebKnossos in your web browser at `http://localhost:9000` to load and annotate your files. To stop the Docker, just type `docker-compose down`.
 
 ![Annotation with WebKnossos](images/annotation_webknossos.gif)
 
