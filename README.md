@@ -32,7 +32,34 @@ Fluospotter uses an [nnU-Net architecture](https://www.nature.com/articles/s4159
 * Class 1 (*border*): Captures the boundaries of the nuclei, helping to separate touching cells.
 * Class 2 (*interior*): Represents the inside region of the cell nuclei.
 
-This multi-class segmentation approach allows Fluospotter to accurately delineate the spatial structure of cell nuclei, even in challenging scenarios where cells are closely packed or overlapping. It also enables segmentation with an unknown number of cells, which can later be utilized for instance segmentation. For instance segmentation, connected component labels are assigned to the regions classified as class 2 (interior) to identify and distinguish individual cells.
+This multi-class segmentation approach allows Fluospotter to accurately delineate the spatial structure of cell nuclei, even in challenging scenarios where cells are closely packed or overlapping. It also enables segmentation with an unknown number of cells, which can later be utilized for instance segmentation.
+
+<table style="border: none; border-collapse: collapse; width: 100%;" align="center">
+  <tr>
+    <td style="padding-right: 20px; border: none; text-align: center;">
+      <img src="images/annotations.png" width="175px" alt="Annotation example">
+      <br>
+      <p style="margin: 5px 0;">Annotation Example 1</p>
+    </td>
+    <td style="padding-right: 20px; border: none; text-align: center;">
+      <img src="images/cells.png" width="175px" alt="Data example">
+      <br>
+      <p style="margin: 5px 0;">Data example 1</p>
+    </td>
+    <td style="padding-right: 20px; border: none; text-align: center;">
+      <img src="images/annotations2.png" width="175px" alt="Annotation example 2">
+      <br>
+      <p style="margin: 5px 0;">Annotation example 2</p>
+    </td>
+    <td style="border: none; text-align: center;">
+      <img src="images/cells2.png" width="175px" alt="Data example 2">
+      <br>
+      <p style="margin: 5px 0;">Data example 2</p>
+    </td>
+  </tr>
+</table>
+
+For instance segmentation, connected component labels are assigned to the regions classified as class 2 (interior) to identify and distinguish individual cells.
 
 Segmentation is performed using a moving window approach to handle the data in smaller chunks, as processing the entire volume at once would be computationally expensive in terms of memory.
 
