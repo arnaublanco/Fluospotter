@@ -89,7 +89,7 @@ cfg = {
     "instance_seg": "True"
 }
 
-model = SegmentationModel(model_name="dynunet", configuration=cfg, pretrained="model.pth", refinement="refinement.pth")
+model = SegmentationModel(configuration=cfg, pretrained="model.pth")
 prediction = model.predict(data)
 ```
 
