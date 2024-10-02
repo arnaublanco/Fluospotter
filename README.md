@@ -59,7 +59,7 @@ This multi-class segmentation approach allows Fluospotter to accurately delineat
   </tr>
 </table>
 
-For instance segmentation, connected component labels are assigned to the regions classified as class 2 (interior) to identify and distinguish individual cells.
+For instance segmentation, connected component labels are assigned to the interior regions (class 2) that are fully enclosed by surrounding borders (class 1), ensuring the identification and distinction of individual cells.
 
 Segmentation is performed using a moving window approach to handle the data in smaller chunks, as processing the entire volume at once would be computationally expensive in terms of memory.
 
