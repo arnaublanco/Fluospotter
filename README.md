@@ -85,13 +85,11 @@ data = Dataset(data_dir="testing_data")
 
 cfg = {
     "patch_size": "48/256/256",
-    "n_classes": "3",
-    "im_size": "48/512/512",
-    "instance_seg": "True",
-    "refinement": "True"
+    "im_size": "105/2014/1024",
+    "instance_seg": "True"
 }
 
-model = SegmentationModel(model_name="dynunet", configuration=cfg, pretrained="model.pth", refinement="refinement.pth")
+model = SegmentationModel(configuration=cfg, pretrained="model.pth")
 prediction = model.predict(data)
 ```
 
